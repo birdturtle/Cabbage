@@ -20,7 +20,7 @@ Download the build for your system from [Releases](https://github.com/birdturtle
 
 ### Windows
 
-Open `Cabbage-Windows-x64-0.1.0-rc.2.exe` and choose **Install Cabbage** or **Keep portable**. Installation adds Cabbage to the Start Menu and Installed Apps without administrator access.
+Open `Cabbage-Windows-x64-0.1.0-rc.3.exe` and choose **Install Cabbage** or **Keep portable**. Installation adds Cabbage to the Start Menu and Installed Apps without administrator access.
 
 [Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) is required. Install it first if it is missing.
 
@@ -29,8 +29,8 @@ Open `Cabbage-Windows-x64-0.1.0-rc.2.exe` and choose **Install Cabbage** or **Ke
 Make the AppImage executable and open it:
 
 ```sh
-chmod +x Cabbage-Linux-x64-0.1.0-rc.2.AppImage
-./Cabbage-Linux-x64-0.1.0-rc.2.AppImage
+chmod +x Cabbage-Linux-x64-0.1.0-rc.3.AppImage
+./Cabbage-Linux-x64-0.1.0-rc.3.AppImage
 ```
 
 Choose **Install Cabbage** to add it to your application menu, or **Keep portable**. Installation does not require sudo.
