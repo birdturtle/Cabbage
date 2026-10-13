@@ -134,3 +134,10 @@ dialog .action-row { display:flex; justify-content:flex-end; gap:10px; margin-to
 .client-menu button { display:block; width:100%; text-align:left; padding:8px 14px; border:0; color:var(--text); background:transparent; }
 .client-menu button:hover:not(:disabled),.client-menu button:focus-visible { background:var(--selection); }
 @media(max-width:700px) { .client-grid { overflow-x:auto; grid-template-columns:repeat(3,minmax(160px,1fr)); } }
+
+.play-controls { position:relative; }
+.client-progress { position:absolute; left:0; right:0; top:-4px; height:3px; overflow:hidden; }
+.client-progress span { display:block; height:100%; width:0; background:var(--accent); transition:width .2s linear; }
+.client-progress.indeterminate span { width:30%; animation:client-progress-sweep 1.4s ease-in-out infinite; }
+@keyframes client-progress-sweep { from { transform:translateX(-100%); } to { transform:translateX(340%); } }
+@media(prefers-reduced-motion:reduce) { .client-progress span { transition:none; } .client-progress.indeterminate span { animation:none; } }

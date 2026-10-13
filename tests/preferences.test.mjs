@@ -12,7 +12,7 @@ function launcher(preferences, options = {}) {
       dataset: {}, checked: false, children: [], listeners: {},
       querySelectorAll: () => [],
       style:{}, focus(){}, contains(){return true;}, getBoundingClientRect(){return {width:150,height:80,left:30,bottom:60};},
-      setAttribute() {}, showModal(){this.open=true;}, close(){this.open=false;},
+      attributes:{}, setAttribute(key,value){this.attributes[key]=value;}, removeAttribute(key){delete this.attributes[key];}, showModal(){this.open=true;}, close(){this.open=false;},
       classList: { toggle() {} },
       elements: { namedItem: (name) => element(`${id}:${name}`) },
       addEventListener(type, callback) { this.listeners[type] = callback; },
@@ -245,4 +245,19 @@ test('client switching stays responsive and rapid clicks save the last choice', 
   release(); await Promise.all([first,last]);
   assert.equal(app.status.selectedClient,'officialOsrs');
   assert.equal(app.calls.filter(call=>call.command==='select_client').at(-1).args.client,'officialOsrs');
+});
+
+test('preparation progress shows percentage, switches to setup, and clears on completion', async () => {
+  const app=launcher({checkUpdatesOnStartup:false},{status:{clientBusy:true,clientMessage:'Downloading client... 20%'}});
+  await settle();
+  assert.equal(app.element('client-progress').hidden,false);
+  assert.equal(app.element('client-progress-fill').style.width,'20%');
+  assert.equal(app.element('client-progress').attributes['aria-valuenow'],'20');
+  app.status.clientMessage='Installing client...'; await app.poll();
+  assert.equal(app.element('client-progress').attributes['aria-valuenow'],undefined);
+  assert.equal(app.element('client-progress-fill').style.width,'');
+  app.status.clientBusy=false; await app.poll();
+  assert.equal(app.element('client-progress').hidden,true);
+  app.status.clients[2].busy=true; app.status.clients[2].message='Downloading RuneScape... 40%'; await app.poll();
+  assert.equal(app.element('client-progress-fill').style.width,'40%');
 });

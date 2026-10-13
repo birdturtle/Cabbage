@@ -63,6 +63,22 @@ function render() {
   const character = status.characters.some(item => item.accountId === status.selectedCharacter);
   $('play').disabled = busy || selectingClient || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
   setText('play', status.clientBusy ? 'Please wait…' : 'Play');
+  const activity = status.clients.find(client => client.id === status.selectedClient && client.busy) || status.clients.find(client => client.busy);
+  const preparing = Boolean(status.clientBusy || activity);
+  const progressMessage = activity?.message || status.clientMessage || '';
+  const percentMatch = progressMessage.match(/(\d+(?:\.\d+)?)%/);
+  const progress = $('client-progress');
+  progress.hidden = !preparing;
+  progress.classList.toggle('indeterminate', preparing && !percentMatch);
+  progress.setAttribute('aria-label', progressMessage || 'Client preparation');
+  if (preparing && percentMatch) {
+    const percent = Math.min(100, Math.max(0, Number(percentMatch[1])));
+    $('client-progress-fill').style.width = `${percent}%`;
+    progress.setAttribute('aria-valuenow', String(percent));
+  } else {
+    $('client-progress-fill').style.width = '';
+    progress.removeAttribute('aria-valuenow');
+  }
   setText('play-hint', status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.'));
   setText('client-version', status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName);
   for (const client of status.clients) {
