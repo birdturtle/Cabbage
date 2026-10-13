@@ -2,6 +2,8 @@
 mod accounts;
 mod auth;
 mod clients;
+mod downloads;
+mod osrs;
 mod runelite;
 mod settings;
 mod storage;

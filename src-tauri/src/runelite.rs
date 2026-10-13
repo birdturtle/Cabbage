@@ -345,28 +345,7 @@ fn extract(archive: &Path, destination: &Path, windows: bool) -> Result<String, 
         .replace('\\', "/"))
 }
 fn activate_manifest(root: &Path, install: &Installed) -> Result<(), String> {
-    let staged = root.join(format!("current-{:x}.json", rand::random::<u64>()));
-    fs::write(
-        &staged,
-        serde_json::to_vec(install).map_err(|_| "Cannot encode the client installation.")?,
-    )
-    .map_err(|_| "Cannot save the client installation.")?;
-    let current = root.join("current.json");
-    let backup = root.join(format!("previous-{:x}.json", rand::random::<u64>()));
-    let had_current = current.exists();
-    if had_current {
-        fs::rename(&current, &backup).map_err(|_| "Cannot prepare client activation.")?;
-    }
-    if fs::rename(&staged, &current).is_err() {
-        if had_current {
-            let _ = fs::rename(&backup, &current);
-        }
-        return Err("Cannot activate the RuneLite installation.".into());
-    }
-    if had_current {
-        let _ = fs::remove_file(backup);
-    }
-    Ok(())
+    crate::downloads::activate_json(root, install)
 }
 pub async fn ensure(root: &Path, state: &Mutex<State>) -> Result<Installed, String> {
     let (os, arch) = platform(std::env::consts::OS, std::env::consts::ARCH)?;
@@ -460,16 +439,7 @@ fn launch_command(root: &Path, install: &Installed, credentials: &[(String, Stri
         .arg(jar_path(root, install))
         .arg("--launch-mode=REFLECT")
         .arg("--noupdate");
-    for key in [
-        "JX_SESSION_ID",
-        "JX_CHARACTER_ID",
-        "JX_DISPLAY_NAME",
-        "JX_ACCESS_TOKEN",
-        "JX_REFRESH_TOKEN",
-    ] {
-        command.env_remove(key);
-    }
-    command.envs(credentials.iter().map(|(k, v)| (k, v)));
+    crate::clients::configure_credentials(&mut command, credentials);
     command
 }
 pub fn spawn(

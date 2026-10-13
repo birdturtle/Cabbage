@@ -21,7 +21,7 @@ function launcher(preferences, options = {}) {
     return elements.get(id);
   }
   const status = {
-    settings: { preferences, selectedGame: 'oldschool', osrsClient: 'runelite' }, selectedClient: 'runelite', clientAvailable: true, clients: [{id: 'runelite', game: 'oldschool', name: 'RuneLite', available: true}, {id: 'officialOsrs', game: 'oldschool', name: 'Official', available: false}, {id: 'officialRs3', game: 'runescape', name: 'Official', available: false}], platform: 'linux', accounts: [], characters: [],
+    settings: { preferences, selectedGame: 'oldschool', osrsClient: 'runelite' }, selectedClient: 'runelite', clientAvailable: true, clients: [{id: 'runelite', game: 'oldschool', name: 'RuneLite', available: true}, {id: 'officialOsrs', game: 'oldschool', name: 'Official', available: true}, {id: 'officialRs3', game: 'runescape', name: 'Official', available: false}], platform: 'linux', accounts: [], characters: [],
     ...options.status,
   };
   runInNewContext(readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8'), {
@@ -37,7 +37,7 @@ function launcher(preferences, options = {}) {
         status.settings.selectedGame = args.game;
         if (args.game === 'oldschool') status.settings.osrsClient = args.client;
         status.selectedClient = args.client;
-        status.clientAvailable = args.client === 'runelite';
+        status.clientAvailable = args.client !== 'officialRs3';
         status.clientMessage = status.clientAvailable ? '' : 'Official client support is not available yet.';
       }
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
@@ -140,10 +140,13 @@ test('game and client selection persist choices and unavailable clients cannot l
   await settle();
   await app.element('client-select').listeners.change({ target: {value:'officialOsrs'} });
   assert.equal(app.status.settings.osrsClient, 'officialOsrs');
+  assert.equal(Boolean(app.element('play').disabled), false);
+  await app.element('play').listeners.click();
+  assert.equal(app.calls.filter(call => call.command === 'launch_client').length, 1);
+  await app.element('game-select').listeners.change({target:{value:'runescape'}});
   assert.equal(app.element('play').disabled, true);
   await app.element('play').listeners.click();
-  assert.ok(!app.calls.some(call => call.command === 'launch_client'));
-  await app.element('game-select').listeners.change({target:{value:'runescape'}});
+  assert.equal(app.calls.filter(call => call.command === 'launch_client').length, 1);
   assert.equal(app.element('launch-title').textContent, 'RuneScape');
   assert.equal(app.element('client-select').children.length, 1);
   await app.element('game-select').listeners.change({target:{value:'oldschool'}});

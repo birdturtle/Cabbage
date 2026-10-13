@@ -1,1 +1,1 @@
-This RSA key is generated solely for local OAuth tests. It has no provider access and must never be used outside tests. The public fixture lets tests verify real JWT signatures, audience, subject and nonce.
+The osrs-environments.jws fixture is a public Jagex publishing document downloaded from https://jagex.akamaized.net/direct6/osrs-win/osrs-win.json in October 2026. It contains release metadata, not account credentials. Used to test publishing signature validation.

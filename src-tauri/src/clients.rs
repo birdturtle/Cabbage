@@ -1,9 +1,9 @@
-use crate::runelite;
+use crate::{osrs, runelite};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    process::Child,
+    process::{Child, Command},
     sync::{Arc, Mutex},
 };
 
@@ -48,7 +48,13 @@ impl ClientId {
         }
         match self {
             Self::Runelite => None,
-            Self::OfficialOsrs => Some("Official Old School client support is not available yet."),
+            Self::OfficialOsrs if arch != "x86_64" => {
+                Some("The official Old School client currently supports x86_64 only.")
+            }
+            Self::OfficialOsrs if os == "linux" && osrs::wine_path().is_none() => {
+                Some("Install Wine to use the official Old School client on Linux.")
+            }
+            Self::OfficialOsrs => None,
             Self::OfficialRs3 => Some("Official RuneScape client support is not available yet."),
         }
     }
@@ -67,17 +73,28 @@ impl ClientId {
                 let install = runelite::ensure(&root, progress).await?;
                 Ok(PreparedClient::RuneLite { root, install })
             }
+            Self::OfficialOsrs => {
+                let root = root.join(self.directory());
+                let install = osrs::ensure(&root, progress).await?;
+                osrs::prepare_wine(&root, progress)?;
+                Ok(PreparedClient::OfficialOsrs { root, install })
+            }
             _ => Err("This client adapter is not available.".into()),
         }
     }
     pub fn installed_version(self, root: &Path) -> Option<String> {
         match self {
             Self::Runelite => runelite::installed(&root.join(self.directory())).map(|i| i.version),
+            Self::OfficialOsrs => osrs::installed(&root.join(self.directory())).map(|i| i.version),
             _ => None,
         }
     }
 }
 pub enum PreparedClient {
+    OfficialOsrs {
+        root: PathBuf,
+        install: osrs::Installed,
+    },
     RuneLite {
         root: PathBuf,
         install: runelite::Installed,
@@ -87,6 +104,26 @@ impl PreparedClient {
     pub fn spawn(self, credentials: &[(String, String)]) -> Result<Child, String> {
         match self {
             Self::RuneLite { root, install } => runelite::spawn(&root, &install, credentials),
+            Self::OfficialOsrs { root, install } => osrs::spawn(&root, &install, credentials),
+        }
+    }
+}
+pub fn configure_credentials(command: &mut Command, credentials: &[(String, String)]) {
+    for key in [
+        "JX_SESSION_ID",
+        "JX_CHARACTER_ID",
+        "JX_DISPLAY_NAME",
+        "JX_ACCESS_TOKEN",
+        "JX_REFRESH_TOKEN",
+    ] {
+        command.env_remove(key);
+    }
+    for (key, value) in credentials {
+        if matches!(
+            key.as_str(),
+            "JX_SESSION_ID" | "JX_CHARACTER_ID" | "JX_DISPLAY_NAME"
+        ) {
+            command.env(key, value);
         }
     }
 }
@@ -251,7 +288,7 @@ mod tests {
     #[test]
     fn unavailable_adapters_cannot_prepare_or_launch() {
         let mut manager = Manager::default();
-        assert!(manager.begin(ClientId::OfficialOsrs, &key("a")).is_err());
+
         assert!(manager.begin(ClientId::OfficialRs3, &key("a")).is_err());
         assert!(manager.preparing.is_empty());
     }
