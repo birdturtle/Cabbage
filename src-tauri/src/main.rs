@@ -128,7 +128,11 @@ async fn launcher_status(
                 .map(str::to_owned)
                 .unwrap_or_else(|| client.message.clone())
         }),
-        client_version: selected.installed_version(&client_root(&app)?),
+        client_version: if selected == clients::ClientId::Runelite {
+            selected.installed_version(&client_root(&app)?).and_then(|_| app.path().home_dir().ok().and_then(|home| runelite::client_version(&home)))
+        } else {
+            selected.installed_version(&client_root(&app)?)
+        },
         accounts: account
             .book
             .accounts

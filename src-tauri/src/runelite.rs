@@ -53,6 +53,32 @@ pub struct Installed {
 fn valid_hash(hash: &str) -> bool {
     hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit())
 }
+
+pub fn client_version(home: &Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut log = fs::File::open(home.join(".runelite/logs/client.log")).ok()?;
+    let size = log.metadata().ok()?.len();
+    log.seek(SeekFrom::Start(size.saturating_sub(256 * 1024))).ok()?;
+    let mut bytes = Vec::new();
+    log.take(256 * 1024).read_to_end(&mut bytes).ok()?;
+    version_from_log(&String::from_utf8_lossy(&bytes))
+}
+
+fn version_from_log(log: &str) -> Option<String> {
+    log.lines().rev().find_map(|line| {
+        let (_, message) = line.split_once("net.runelite.client.RuneLite - RuneLite")?;
+        let (version, _) = message.trim_start().split_once(" (launcher version ")?;
+        semver::Version::parse(version).ok()?;
+        Some(version.to_owned())
+    })
+}
+
+#[test]
+fn client_version_uses_latest_startup_not_launcher_version() {
+    let log = "net.runelite.client.RuneLite - RuneLite 1.12.39 (launcher version 2.8.0) starting up\nnet.runelite.client.RuneLite - RuneLite\u{a0}1.13.1 (launcher version 2.8.0) starting up";
+    assert_eq!(version_from_log(log).as_deref(), Some("1.13.1"));
+    assert_eq!(version_from_log("launcher 2.8.0"), None);
+}
 fn safe_path(path: &Path) -> Result<(), String> {
     let text = path.to_string_lossy();
     if path.as_os_str().is_empty()

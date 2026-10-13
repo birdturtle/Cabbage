@@ -1,4 +1,5 @@
 const invoke = window.__TAURI__?.core.invoke;
+document.addEventListener('contextmenu', event => event.preventDefault());
 let status;
 let busy = false;
 let checkingUpdates = false;
