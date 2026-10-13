@@ -3,6 +3,7 @@ mod accounts;
 mod auth;
 mod clients;
 mod downloads;
+mod graphics;
 mod osrs;
 mod rs3;
 mod runelite;
@@ -274,7 +275,13 @@ async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<S
         // Downloads may take time. Renew the captured account/character immediately before spawning.
         let prepared = tauri::async_runtime::block_on(selected.prepare(&root, &progress))?;
         let credentials = prepare_play(&handle, &target)?;
-        let child = prepared.spawn(&credentials)?;
+        let prefer_gpu = state
+            .settings
+            .lock()
+            .unwrap()
+            .preferences
+            .prefer_dedicated_gpu;
+        let child = prepared.spawn(&credentials, prefer_gpu)?;
         state
             .clients
             .lock()

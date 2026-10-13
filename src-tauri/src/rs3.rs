@@ -452,6 +452,7 @@ pub fn spawn(
     root: &Path,
     prepared: Prepared,
     credentials: &[(String, String)],
+    prefer_gpu: bool,
 ) -> Result<Child, String> {
     let root = fs::canonicalize(root).map_err(|_| "Cannot locate RuneScape installation.")?;
     let launch = root.join("launches");
@@ -486,6 +487,7 @@ pub fn spawn(
         .stderr(log)
         .stdin(Stdio::null());
     configure_credentials(&mut command, credentials);
+    crate::graphics::configure(&mut command, prefer_gpu);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

@@ -166,3 +166,18 @@ test('game and client selection persist choices and support both games', async (
   await app.element('play').listeners.click();
   assert.ok(!app.calls.some(call => call.command === 'launch_client'));
 });
+
+test('dedicated GPU preference loads, survives polling, and saves on Linux', async () => {
+  const app = launcher({preferDedicatedGpu: true, checkUpdatesOnStartup:false});
+  await settle();
+  assert.equal(app.element('dedicated-gpu-preference').hidden, false);
+  assert.equal(app.element('preferences-form:preferDedicatedGpu').checked, true);
+  app.element('preferences-form:preferDedicatedGpu').checked = false;
+  await app.poll();
+  assert.equal(app.element('preferences-form:preferDedicatedGpu').checked, false);
+  await app.element('preferences-form').listeners.submit({preventDefault(){},currentTarget:app.element('preferences-form')});
+  assert.equal(app.calls.find(call => call.command === 'save_preferences').args.preferences.preferDedicatedGpu, false);
+  const windows = launcher({preferDedicatedGpu:false,checkUpdatesOnStartup:false}, {status:{platform:'windows'}});
+  await settle();
+  assert.equal(windows.element('dedicated-gpu-preference').hidden, true);
+});

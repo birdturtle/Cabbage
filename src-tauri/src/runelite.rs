@@ -446,6 +446,7 @@ pub fn spawn(
     root: &Path,
     install: &Installed,
     credentials: &[(String, String)],
+    prefer_gpu: bool,
 ) -> Result<Child, String> {
     let log = fs::OpenOptions::new()
         .create(true)
@@ -454,6 +455,7 @@ pub fn spawn(
         .open(root.join("launch.log"))
         .map_err(|_| "Cannot open the RuneLite launch log.")?;
     let mut command = launch_command(root, install, credentials);
+    crate::graphics::configure(&mut command, prefer_gpu);
     command
         .stdin(Stdio::null())
         .stdout(Stdio::from(

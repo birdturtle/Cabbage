@@ -563,6 +563,7 @@ pub fn spawn(
     root: &Path,
     installed: &Installed,
     credentials: &[(String, String)],
+    prefer_gpu: bool,
 ) -> Result<Child, String> {
     let wine = if cfg!(target_os = "linux") {
         Some(wine_path().ok_or("Install Wine to use the official Old School client on Linux.")?)
@@ -570,6 +571,7 @@ pub fn spawn(
         None
     };
     let mut launch = launch_command(root, installed, credentials, wine.as_deref())?;
+    crate::graphics::configure(&mut launch, prefer_gpu);
     let log = fs::OpenOptions::new()
         .create(true)
         .write(true)

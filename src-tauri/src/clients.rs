@@ -112,11 +112,21 @@ pub enum PreparedClient {
     },
 }
 impl PreparedClient {
-    pub fn spawn(self, credentials: &[(String, String)]) -> Result<Child, String> {
+    pub fn spawn(
+        self,
+        credentials: &[(String, String)],
+        prefer_gpu: bool,
+    ) -> Result<Child, String> {
         match self {
-            Self::RuneLite { root, install } => runelite::spawn(&root, &install, credentials),
-            Self::OfficialOsrs { root, install } => osrs::spawn(&root, &install, credentials),
-            Self::OfficialRs3 { root, prepared } => rs3::spawn(&root, prepared, credentials),
+            Self::RuneLite { root, install } => {
+                runelite::spawn(&root, &install, credentials, prefer_gpu)
+            }
+            Self::OfficialOsrs { root, install } => {
+                osrs::spawn(&root, &install, credentials, prefer_gpu)
+            }
+            Self::OfficialRs3 { root, prepared } => {
+                rs3::spawn(&root, prepared, credentials, prefer_gpu)
+            }
         }
     }
 }

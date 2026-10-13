@@ -9,3 +9,9 @@ RuneLite is the first client integration for both platforms. The inspected Jagex
 Launcher installation and updates will be separate from each client's installation and updates. Development and installed launchers must have distinct launch workflows so testing never redirects an existing installation.
 
 Windows runtime acceptance remains necessary; passing Linux tests does not establish Windows behavior.
+
+## Dedicated GPU preference
+
+Linux Settings offers Prefer dedicated GPU, disabled by default. It applies to newly launched RuneLite, Official OSRS and RS3 processes. Systems with multiple DRM GPU devices use NVIDIA PRIME offload when the NVIDIA kernel module is present, or Mesa DRI_PRIME otherwise. Single-GPU systems retain normal selection. The RS3 host inherits the selected graphics environment and passes it to the game. Cabbage's UI and authentication browser are unaffected. Windows keeps OS-managed GPU selection and hides this Linux-specific control.
+
+Verified on the development laptop: the offload environment reports NVIDIA GeForce RTX 4050 Laptop GPU in glxinfo. Confirm the restarted game's renderer separately. References: https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/optimus-laptops-and-multi-gpu-desktop-systems.html and https://docs.mesa3d.org/envvars.html.

@@ -13,6 +13,7 @@ pub struct Settings {
 #[serde(rename_all = "camelCase", default)]
 pub struct Preferences {
     pub minimize_on_play: bool,
+    pub prefer_dedicated_gpu: bool,
     pub check_updates_on_startup: bool,
     pub include_beta_updates: bool,
 }
@@ -58,9 +59,18 @@ mod tests {
         assert_eq!(restored.selected_client(), ClientId::OfficialOsrs);
     }
     #[test]
+    fn gpu_preference_survives_settings_round_trip() {
+        let mut settings = Settings::default();
+        settings.preferences.prefer_dedicated_gpu = true;
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert!(restored.preferences.prefer_dedicated_gpu);
+    }
+    #[test]
     fn obsolete_component_paths_are_discarded_without_losing_preferences() {
         let settings: Settings = serde_json::from_str(r#"{"hapticscapeJar":"old.jar","lumbridgeJar":"old.jar","managedComponents":true,"preferences":{"includeBetaUpdates":true}}"#).unwrap();
         assert!(settings.preferences.include_beta_updates);
+        assert!(!settings.preferences.prefer_dedicated_gpu);
         assert_eq!(settings.selected_client(), ClientId::Runelite);
         let saved = serde_json::to_value(settings).unwrap();
         assert!(saved.get("hapticscapeJar").is_none());
