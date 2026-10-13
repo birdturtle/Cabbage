@@ -238,6 +238,7 @@ $('preferences-form').addEventListener('submit', async (event) => {
   const preferences = Object.fromEntries(['preferDedicatedGpu', 'checkUpdatesOnStartup', 'includeBetaUpdates'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
   preferences.afterPlay = event.currentTarget.elements.namedItem('afterPlay').value || 'keepOpen';
   await action('save_preferences', { preferences });
+  $('install-update').hidden = true;
   $('release-name').hidden = true;
   $('release-notes').hidden = true;
   updateFeedback = true;
@@ -248,6 +249,7 @@ async function checkUpdates() {
   if (busy) return;
   checkingUpdates = true;
   updateFeedback = true;
+  $('install-update').hidden = true;
   $('release-name').hidden = true;
   $('release-notes').hidden = true;
   const channel = status?.settings.preferences.includeBetaUpdates ? 'Beta' : 'Stable';
@@ -259,6 +261,7 @@ async function checkUpdates() {
     if (!release) return;
     $('release-name').textContent = release.name || release.tag; $('release-name').hidden = false;
     $('update-message').textContent = release.message || '';
+    $('install-update').hidden = !release.available || !(await invoke('installation_status')).canInstall;
     $('release-summary').textContent = `Installed: ${release.installedVersion || status.installedVersion || ''} · Channel: ${channel} · Latest: ${release.tag}${release.publishedAt ? ` · ${new Date(release.publishedAt).toLocaleDateString()}` : ''}`;
     $('release-notes').textContent = release.notes || 'No release notes were provided.'; $('release-notes').hidden = false;
   } finally {
@@ -266,9 +269,30 @@ async function checkUpdates() {
     render();
   }
 }
+$('install-update').addEventListener('click', async () => {
+  if (busy) return;
+  const timer = setInterval(async () => {
+    try {
+      const progress = await invoke('update_progress');
+      $('update-message').textContent = progress.message;
+      $('update-progress').hidden = !progress.busy;
+      if (progress.percent == null) $('update-progress').removeAttribute('value');
+      else $('update-progress').value = progress.percent;
+    } catch {}
+  }, 250);
+  try {
+    await action('install_update');
+    const progress = await invoke('update_progress');
+    $('update-message').textContent = progress.message;
+  } finally { clearInterval(timer); $('update-progress').hidden = true; }
+});
 $('check-updates').addEventListener('click', checkUpdates);
 async function initialize() {
   await refresh();
+  if (status && invoke) {
+    try { const recovery = await invoke('acknowledge_update'); if (recovery) toast(recovery, true); }
+    catch (error) { toast(error, true); }
+  }
   await refreshInstallation(true);
   if (!status) { $('play').disabled = true; return; }
   if (invoke) {

@@ -50,7 +50,7 @@ function launcher(preferences, options = {}) {
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
     } } } },
     document: {addEventListener(){}, getElementById: element, querySelectorAll: () => [], createElement: () => element(`option:${Math.random()}`), createElementNS: () => element(`svg:${Math.random()}`) },
-    setTimeout: () => 1, clearTimeout() {}, setInterval(callback) { poll = callback; },
+    setTimeout: () => 1, clearTimeout() {}, clearInterval() {}, setInterval(callback) { poll = callback; },
   });
   return { calls, element, status, poll: () => poll() };
 }
@@ -60,7 +60,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 test('accounts load and releases check once; polling preserves unsaved edits', async () => {
   const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: true });
   await settle();
-  assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['installation_status', 'load_accounts', 'check_updates']);
+  assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['acknowledge_update', 'installation_status', 'load_accounts', 'check_updates']);
   app.element('preferences-form:afterPlay').value = 'hideToTray';
   await app.poll();
   assert.equal(app.element('preferences-form:afterPlay').value, 'hideToTray');
@@ -75,7 +75,7 @@ test('accounts load and releases check once; polling preserves unsaved edits', a
 test('accounts always load, while release checks remain opt-in', async () => {
   const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: false });
   await settle();
-  assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'installation_status', 'load_accounts', 'launcher_status']);
+  assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'acknowledge_update', 'installation_status', 'load_accounts', 'launcher_status']);
 });
 
 test('expired account offers the existing browser sign-in flow and keeps its character visible', async () => {
@@ -305,4 +305,14 @@ test('a downloaded build can replace an existing installation', async () => {
   await settle();
   assert.equal(installed.element('install-launcher').hidden, true);
   assert.ok(!installed.element('install-launcher-dialog').open);
+});
+
+
+test('release update button requires an upgrade and a packaged launcher', async () => {
+  for (const [available, canInstall, hidden] of [[true,true,false],[true,false,true],[false,true,true]]) {
+    const app = launcher({checkUpdatesOnStartup:false}, {release:{tag:'v0.1.0-rc.3',available},installation:{canInstall}});
+    await settle(); await app.element('check-updates').listeners.click();
+    assert.equal(app.element('install-update').hidden,hidden);
+    assert.ok(!app.calls.some(call=>call.command==='install_update'));
+  }
 });

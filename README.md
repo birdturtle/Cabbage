@@ -12,7 +12,7 @@ An unofficial Windows and Linux launcher for RuneScape and Old School RuneScape.
 - System tray support.
 - Keep the launcher open, hide it to the tray, or close it after Play.
 - Dedicated GPU preference on Linux.
-- Release checks with optional beta updates.
+- Launcher updates with optional beta releases.
 
 ## Installation
 
@@ -20,7 +20,7 @@ Download the build for your system from [Releases](https://github.com/birdturtle
 
 ### Windows
 
-Open `Cabbage-Windows-x64-0.1.0-rc.1.exe` and choose **Install Cabbage** or **Keep portable**. Installation adds Cabbage to the Start Menu and Installed Apps without administrator access.
+Open `Cabbage-Windows-x64-0.1.0-rc.2.exe` and choose **Install Cabbage** or **Keep portable**. Installation adds Cabbage to the Start Menu and Installed Apps without administrator access.
 
 [Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) is required. Install it first if it is missing.
 
@@ -29,8 +29,8 @@ Open `Cabbage-Windows-x64-0.1.0-rc.1.exe` and choose **Install Cabbage** or **Ke
 Make the AppImage executable and open it:
 
 ```sh
-chmod +x Cabbage-Linux-x64-0.1.0-rc.1.AppImage
-./Cabbage-Linux-x64-0.1.0-rc.1.AppImage
+chmod +x Cabbage-Linux-x64-0.1.0-rc.2.AppImage
+./Cabbage-Linux-x64-0.1.0-rc.2.AppImage
 ```
 
 Choose **Install Cabbage** to add it to your application menu, or **Keep portable**. Installation does not require sudo.
@@ -45,7 +45,9 @@ Use **Settings > Installation > Uninstall Cabbage**. Windows installations can a
 
 The Updates page checks Cabbage releases. Enable **Include beta updates** to see release candidates.
 
-Launcher update installation is not included in this RC. Download new builds from Releases and choose Install Cabbage. Close an older launcher before installing its replacement.
+Choose **Install update and restart** to update an installed or portable launcher. Saved accounts, settings and game installations are kept. Running games stay open.
+
+RC1 users need to download RC2 manually to enable update installation.
 
 ## Development
 

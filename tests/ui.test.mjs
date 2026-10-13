@@ -19,7 +19,7 @@ test('launcher content policy prohibits remote scripts and frames', () => {
 test('obsolete application and suite installation commands are not exposed', () => {
   const build = readFileSync(new URL('../src-tauri/build.rs', import.meta.url), 'utf8');
   const permissions = readFileSync(new URL('../src-tauri/permissions/launcher.toml', import.meta.url), 'utf8');
-  for (const command of ['install_components', 'install_update', 'launch_app', 'save_settings', 'launcher_ready']) {
+  for (const command of ['install_components', 'launch_app', 'save_settings', 'launcher_ready']) {
     assert.ok(!build.includes('"' + command + '"'));
     assert.ok(!permissions.includes('"' + command + '"'));
   }

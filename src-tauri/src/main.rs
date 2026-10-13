@@ -14,6 +14,7 @@ mod settings;
 mod storage;
 mod tray;
 mod updates;
+mod update_install;
 
 use auth::{AccountState, Callback, Phase};
 use serde::Serialize;
@@ -25,6 +26,7 @@ struct AppState {
     settings: Mutex<Settings>,
     account: Mutex<AccountState>,
     wallet: Mutex<()>,
+    update: update_install::SharedProgress,
     http: reqwest::Client,
     clients: Mutex<clients::Manager>,
 }
@@ -60,6 +62,13 @@ struct AccountSummary {
 }
 
 fn local(window: &WebviewWindow) -> Result<(), String> {
+    local_origin(window)?;
+    if let Some(state) = window.app_handle().try_state::<AppState>() {
+        if state.update.lock().unwrap().busy { return Err("Wait for the launcher update to finish.".into()); }
+    }
+    Ok(())
+}
+fn local_origin(window: &WebviewWindow) -> Result<(), String> {
     let url = window
         .url()
         .map_err(|_| "Cannot validate the launcher window.".to_string())?;
@@ -742,6 +751,67 @@ async fn check_updates(
     updates::describe(release, &app.package_info().version.to_string())
 }
 
+#[tauri::command]
+fn acknowledge_update(window: WebviewWindow, app: tauri::AppHandle) -> Result<Option<String>, String> {
+    local_origin(&window)?;
+    let layout = installation_layout(&app)?;
+    if cfg!(windows) && std::env::var_os("CABBAGE_UPDATE_ACK").is_some() && installation::status(&layout).running_installed {
+        if let Some(source) = installation::source() { installation::install(&layout, &source)?; }
+    }
+    update_install::acknowledge_startup();
+    let error = installation::source().map(|p| p.with_extension("update-error"));
+    let message = error.as_ref().and_then(|p| fs::read_to_string(p).ok()).filter(|s| s.len() < 4096);
+    if let Some(path) = error { let _ = fs::remove_file(path); }
+    Ok(message)
+}
+#[tauri::command]
+fn update_progress(window: WebviewWindow, app: tauri::AppHandle) -> Result<update_install::Progress, String> {
+    local_origin(&window)?;
+    Ok(app.state::<AppState>().update.lock().unwrap().clone())
+}
+fn update_idle(state: &AppState) -> Result<(), String> {
+    let _wallet = state.wallet.try_lock().map_err(|_| "Wait for account changes to finish, then retry.")?;
+    if state.account.lock().unwrap().attempt.is_some() { return Err("Finish signing in before updating Cabbage.".into()); }
+    let mut clients = state.clients.lock().unwrap();
+    for client in clients::registry() {
+        if clients.progress(client.id).lock().unwrap().busy { return Err("Wait for the game download or installation to finish, then retry.".into()); }
+    }
+    Ok(())
+}
+#[tauri::command]
+async fn install_update(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    local(&window)?;
+    let state = app.state::<AppState>();
+    let target = update_install::target()?;
+    {
+        let mut progress = state.update.lock().unwrap();
+        if progress.busy { return Err("An update is already in progress.".into()); }
+        update_idle(&state)?;
+        *progress = update_install::Progress { busy: true, percent: None, message: "Checking update signature…".into() };
+    }
+    let result: Result<(), String> = async {
+        let beta = state.settings.lock().unwrap().preferences.include_beta_updates;
+        let release = updates::latest(&state.http, beta).await?;
+        let v = updates::version(&release.tag_name)?;
+        if v <= updates::version(env!("CARGO_PKG_VERSION"))? { return Err("You have the latest version.".into()); }
+        let http = update_install::http()?;
+        let (staged, sha256) = update_install::stage(&http, &release.tag_name, &target, &state.update).await?;
+        let apply = (|| {
+            update_idle(&state)?;
+            update_install::apply(target, staged.clone(), sha256, v.to_string(), &client_root(&app)?.join("launcher-update"))
+        })();
+        if apply.is_err() { let _ = fs::remove_file(staged); }
+        apply?;
+        state.update.lock().unwrap().message = "Restarting Cabbage…".into();
+        app.exit(0);
+        Ok(())
+    }.await;
+    if let Err(error) = &result {
+        *state.update.lock().unwrap() = update_install::Progress { busy: false, percent: None, message: error.clone() };
+    }
+    result
+}
+
 fn installation_layout(app: &tauri::AppHandle) -> Result<installation::Layout, String> {
     #[cfg(windows)] {
         Ok(installation::Layout::windows(
@@ -833,6 +903,7 @@ fn main() {
                 settings: Mutex::new(settings),
                 account: Mutex::new(AccountState::default()),
                 wallet: Mutex::new(()),
+                update: Default::default(),
                 clients: Mutex::new(clients::Manager::default()),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
@@ -871,7 +942,10 @@ fn main() {
             select_account,
             remove_account,
             select_character,
-            check_updates
+            check_updates,
+            install_update,
+            update_progress,
+            acknowledge_update
         ])
         .run(tauri::generate_context!())
         .expect("Launcher could not start");
