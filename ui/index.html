@@ -52,7 +52,7 @@
       <section class="page" id="settings" hidden>
         <form class="panel preferences-form" id="preferences-form">
           <h2>Launch behavior</h2>
-          <label class="preference-row"><input type="checkbox" name="minimizeOnPlay"><span>Minimize to system tray after Play</span></label>
+          <label class="after-play-row" for="after-play">After Play<select id="after-play" name="afterPlay"><option value="keepOpen">Keep launcher open</option><option value="hideToTray">Hide to system tray</option><option value="closeLauncher">Close launcher</option></select></label>
           <label class="preference-row" id="dedicated-gpu-preference" hidden><input type="checkbox" name="preferDedicatedGpu"><span>Prefer dedicated GPU</span></label>
           <h2>Updates</h2>
           <label class="preference-row"><input type="checkbox" name="checkUpdatesOnStartup"><span>Check for updates when the launcher opens</span></label>

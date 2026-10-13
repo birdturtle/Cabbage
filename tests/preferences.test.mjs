@@ -57,22 +57,22 @@ function launcher(preferences, options = {}) {
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 test('accounts load and releases check once; polling preserves unsaved edits', async () => {
-  const app = launcher({ minimizeOnPlay: false, checkUpdatesOnStartup: true });
+  const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: true });
   await settle();
   assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['load_accounts', 'check_updates']);
-  app.element('preferences-form:minimizeOnPlay').checked = true;
+  app.element('preferences-form:afterPlay').value = 'hideToTray';
   await app.poll();
-  assert.equal(app.element('preferences-form:minimizeOnPlay').checked, true);
+  assert.equal(app.element('preferences-form:afterPlay').value, 'hideToTray');
   assert.equal(app.calls.filter((call) => call.command === 'load_accounts').length, 1);
   assert.equal(app.calls.filter((call) => call.command === 'check_updates').length, 1);
   await app.element('preferences-form').listeners.submit({ preventDefault() {}, currentTarget: app.element('preferences-form') });
   const saved = app.calls.find((call) => call.command === 'save_preferences');
-  assert.equal(saved.args.preferences.minimizeOnPlay, true);
+  assert.equal(saved.args.preferences.afterPlay, 'hideToTray');
   assert.equal(typeof saved.args.preferences.checkUpdatesOnStartup, 'boolean');
 });
 
 test('accounts always load, while release checks remain opt-in', async () => {
-  const app = launcher({ minimizeOnPlay: false, checkUpdatesOnStartup: false });
+  const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: false });
   await settle();
   assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'load_accounts', 'launcher_status']);
 });
@@ -271,4 +271,11 @@ test('Play stays visually enabled while an available client selection is saving'
   await app.poll(); assert.equal(app.element('play').disabled,false);
   release(); await selection;
   assert.equal(app.element('play').disabled,false);
+});
+
+test('close launcher after Play loads and saves as a single choice', async () => {
+  const app=launcher({afterPlay:'closeLauncher',checkUpdatesOnStartup:false}); await settle();
+  assert.equal(app.element('preferences-form:afterPlay').value,'closeLauncher');
+  await app.element('preferences-form').listeners.submit({preventDefault(){},currentTarget:app.element('preferences-form')});
+  assert.equal(app.calls.find(call=>call.command==='save_preferences').args.preferences.afterPlay,'closeLauncher');
 });

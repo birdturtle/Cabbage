@@ -10,7 +10,7 @@ The launcher runs in REFLECT mode so the process Cabbage tracks is the client pr
 
 The initial managed Java runtime is reused for launcher updates. Java-runtime update policy and garbage collection of previous component versions remain follow-up work.
 
-Logs are saved to clients/runelite/launch.log under Cabbage's data directory. Process exits clear running status. Downloads report progress and failures on the main screen. Minimize after Play hides Cabbage to the tray when available, with ordinary minimization as fallback.
+Logs are saved to clients/runelite/launch.log under Cabbage's data directory. Process exits clear running status. Downloads report progress and failures on the main screen. After Play can keep Cabbage open, hide it to the tray (with ordinary minimization as fallback), or close Cabbage while leaving the game running.
 
 Supported download targets: Windows and Linux on x86_64 and aarch64. Windows acceptance still requires live sign-in and gameplay testing. The optional official-download integration test verifies real packages without signing in or starting a game.
 

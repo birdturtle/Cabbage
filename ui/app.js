@@ -152,7 +152,11 @@ async function refresh() {
     status = nextStatus;
     $('dedicated-gpu-preference').hidden = status.platform !== 'linux';
     if (!$('preferences-form').dataset.loaded) {
-      for (const [key, value] of Object.entries(status.settings.preferences)) $('preferences-form').elements.namedItem(key).checked = value;
+      for (const [key, value] of Object.entries(status.settings.preferences)) {
+        const field = $('preferences-form').elements.namedItem(key);
+        if (!field) continue;
+        if (key === 'afterPlay') field.value = value; else field.checked = value;
+      }
       $('preferences-form').dataset.loaded = 'true';
     }
     render();
@@ -230,7 +234,8 @@ $('remove-account').addEventListener('click', () => { if (status?.selectedAccoun
 for (const [id, command] of [['sign-in', 'begin_login'], ['cancel-login', 'cancel_login']]) $(id).addEventListener('click', () => action(command));
 $('preferences-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const preferences = Object.fromEntries(['minimizeOnPlay', 'preferDedicatedGpu', 'checkUpdatesOnStartup', 'includeBetaUpdates'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
+  const preferences = Object.fromEntries(['preferDedicatedGpu', 'checkUpdatesOnStartup', 'includeBetaUpdates'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
+  preferences.afterPlay = event.currentTarget.elements.namedItem('afterPlay').value || 'keepOpen';
   await action('save_preferences', { preferences });
   $('release-name').hidden = true;
   $('release-notes').hidden = true;

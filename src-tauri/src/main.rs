@@ -353,12 +353,17 @@ async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<S
         .unwrap()
         .finish(selected, &key, &result);
     result?;
-    if state.settings.lock().unwrap().preferences.minimize_on_play {
-        if tray::available(&app) {
-            let _ = window.hide();
-        } else {
-            let _ = window.minimize();
+    let after_play = state.settings.lock().unwrap().preferences.after_play;
+    match after_play {
+        settings::AfterPlay::KeepOpen => {}
+        settings::AfterPlay::HideToTray => {
+            if tray::available(&app) {
+                let _ = window.hide();
+            } else {
+                let _ = window.minimize();
+            }
         }
+        settings::AfterPlay::CloseLauncher => app.exit(0),
     }
     Ok(format!("{} launched.", selected.name()))
 }
