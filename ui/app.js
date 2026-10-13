@@ -269,6 +269,7 @@ async function checkUpdates() {
 $('check-updates').addEventListener('click', checkUpdates);
 async function initialize() {
   await refresh();
+  await refreshInstallation(true);
   if (!status) { $('play').disabled = true; return; }
   if (invoke) {
     try { await invoke('load_accounts'); } catch (error) { toast(error, true); }
@@ -279,3 +280,31 @@ async function initialize() {
 initialize(); setInterval(refresh, 2000);
 
 $('reauthenticate').addEventListener('click', () => action('begin_login'));
+
+async function refreshInstallation(offer = false) {
+  if (!invoke) return;
+  try {
+    const installation = await invoke('installation_status');
+    $('launcher-installation').hidden = !installation.canInstall && !installation.installed;
+    setText('install-launcher-description', status?.platform === 'windows' ? 'Add Cabbage to your Start Menu.' : 'Add Cabbage to your application menu.');
+    $('install-launcher').hidden = !installation.canInstall || installation.installed;
+    $('uninstall-launcher').hidden = !installation.installed;
+    setText('installation-message', installation.installed ? 'Cabbage is installed for your user account.' : 'Run portably or add Cabbage to your application menu.');
+    if (offer && installation.offerInstall) $('install-launcher-dialog').showModal();
+  } catch (error) { toast(error, true); }
+}
+$('install-launcher').addEventListener('click', () => $('install-launcher-dialog').showModal());
+$('use-portable').addEventListener('click', async () => {
+  await action('keep_portable'); $('install-launcher-dialog').close();
+});
+$('install-launcher-dialog').addEventListener('cancel', event => {
+  event.preventDefault(); $('use-portable').click();
+});
+$('confirm-install-launcher').addEventListener('click', async () => {
+  await action('install_launcher'); $('install-launcher-dialog').close(); await refreshInstallation();
+});
+$('uninstall-launcher').addEventListener('click', () => $('uninstall-launcher-dialog').showModal());
+$('cancel-uninstall-launcher').addEventListener('click', () => $('uninstall-launcher-dialog').close());
+$('confirm-uninstall-launcher').addEventListener('click', async () => {
+  await action('uninstall_launcher'); $('uninstall-launcher-dialog').close(); await refreshInstallation();
+});

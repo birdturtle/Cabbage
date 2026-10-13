@@ -12,15 +12,15 @@ Updates currently checks versions and displays notes. There is no Install update
 
 ## Package strategy
 
-Use Tauri v2's signed updater with a Cabbage-specific key. Windows starts with a per-user NSIS installer. Linux starts with an AppImage, with an install helper for desktop integration if needed. These are supported updater artifacts; arbitrary raw development executables and system-owned packages are not interchangeable with them. Tauri requires update signatures. Its updater key is separate from optional Windows Authenticode signing.
+Use Tauri v2's signed updater with a Cabbage-specific key. Windows starts with one standalone EXE offering per-user installation or portable use. Installed copies live under LocalAppData/cabbage/launcher and have a Start Menu shortcut and a user-scoped Installed Apps entry. Linux starts with an AppImage, with an install helper for desktop integration if needed. Tauri supports AppImage installation, but its Windows installer expects NSIS/MSI artifacts. The standalone Windows EXE will need verified download plus a separate replacement helper, or an internal installer that targets the same installation. Do not call the updater plugin installer on a raw EXE. Development executables and system-owned packages remain distinct. Tauri requires update signatures. Its updater key is separate from optional Windows Authenticode signing.
 
 The installed launcher keeps its existing application ID, vault, preferences and client directories. The launcher package contains Cabbage and its small helper, not RuneLite, OSRS, RS3 or Wine. Game-client downloads and launcher updates remain separate.
 
 ## Game host requirement
 
-RS3 currently re-executes std::env::current_exe as --rs3-host. That means a game can keep the launcher executable in use after the GUI exits. This is a packaging risk for Windows replacement and for the lifetime of a Linux AppImage mount. It needs resolution before shipping launcher updates.
+RS3 now runs a separate cabbage-game-host executable with no GUI or account-vault dependencies. The launcher build compiles and embeds the platform helper. Before launch, Cabbage installs its exact bytes under the RS3 support directory named by the helper SHA256. Existing copies are verified and never overwritten; active versions are retained. The GUI executable and a future AppImage mount are no longer needed by the running supervisor.
 
-Split the IPC/job supervisor into a standalone cabbage-game-host helper without GUI dependencies. Ship it in the signed launcher package and copy verified helpers to immutable, versioned client-support storage before launch. Active helpers must not be overwritten or cleaned up by a launcher update. The helper keeps credentials in the child environment, preserves game lifetime tracking, and does not receive account-vault access. Test Close after Play and updates with an active host in actual installed packages on both platforms.
+The helper retains Linux FIFO IPC and Windows job tracking. It is embedded in the launcher so future package signatures cover its bytes. The helper keeps credentials in the child environment, preserves game lifetime tracking, and does not receive account-vault access. Test Close after Play and updates with an active host in actual installed packages on both platforms.
 
 ## Release selection and signing
 
@@ -32,14 +32,14 @@ Release CI must check that the tag version matches Cargo, Tauri and npm, run tes
 
 The Updates page will offer Install update only for a newer, supported release with a valid Cabbage manifest. Download progress, errors and retry stay visible. Downloads may be staged while a game runs. Applying an update must wait until client preparation, account writes and browser authorization are idle. Game processes and active helpers remain running. Restart launches the updated Cabbage installation rather than a development preview.
 
-Use an explicit installer-written installation mode. AppImage and NSIS installations receive the corresponding self-update path. Development previews only check releases. System-package installations use their package manager. Do not infer package ownership from an absent marker, which previously caused incorrect update behavior in the parent project.
+Use an explicit installer-written installation mode. AppImage and windowsExe installations receive their corresponding self-update paths. Development previews only check releases. System-package installations use their package manager. Do not infer package ownership from an absent marker, which previously caused incorrect update behavior in the parent project.
 
 Keep the current launcher intact through download and signature verification. Retain a verified previous artifact for recovery and test actual installer failure and restart behavior. The updater plugin is not a substitute for an installed-package rollback test. Automatic post-startup rollback must not be claimed until an independent recovery mechanism is implemented and tested. Recovery must not clear account storage, preferences or game caches.
 
 ## Implementation order
 
-1. Extract and test the standalone versioned game host.
-2. Add NSIS/AppImage packaging, installation identity/mode and installed-package smoke tests.
+1. Standalone versioned game host implemented; live Windows and installed-package acceptance remains.
+2. Linux AppImage and Windows standalone EXE packaging with installation identity/mode are implemented; Windows CI and installed-package acceptance must pass.
 3. Configure a Cabbage signing key and release CI.
 4. Add the restricted Rust Install update command, progress/retry UI and restart handling.
 5. Test upgrade between signed RC packages, matching RC-to-stable selection, malformed metadata, wrong signatures/targets, network interruption, locked files, failed restart, running games and preserved accounts.

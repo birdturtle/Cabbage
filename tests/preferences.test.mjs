@@ -33,6 +33,7 @@ function launcher(preferences, options = {}) {
     window: {innerWidth:1200,innerHeight:800,addEventListener(){}, __TAURI__: { core: { async invoke(command, args) {
       calls.push({ command, args });
       if (command === 'launcher_status') return status;
+      if (command === 'installation_status') return options.installation || { installed: false, canInstall: false, offerInstall: false };
       if (command === 'check_updates') {
         if (options.checkGate) await options.checkGate;
         if (options.checkError) throw options.checkError;
@@ -59,7 +60,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 test('accounts load and releases check once; polling preserves unsaved edits', async () => {
   const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: true });
   await settle();
-  assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['load_accounts', 'check_updates']);
+  assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['installation_status', 'load_accounts', 'check_updates']);
   app.element('preferences-form:afterPlay').value = 'hideToTray';
   await app.poll();
   assert.equal(app.element('preferences-form:afterPlay').value, 'hideToTray');
@@ -74,7 +75,7 @@ test('accounts load and releases check once; polling preserves unsaved edits', a
 test('accounts always load, while release checks remain opt-in', async () => {
   const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: false });
   await settle();
-  assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'load_accounts', 'launcher_status']);
+  assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'installation_status', 'load_accounts', 'launcher_status']);
 });
 
 test('expired account offers the existing browser sign-in flow and keeps its character visible', async () => {
@@ -278,4 +279,16 @@ test('close launcher after Play loads and saves as a single choice', async () =>
   assert.equal(app.element('preferences-form:afterPlay').value,'closeLauncher');
   await app.element('preferences-form').listeners.submit({preventDefault(){},currentTarget:app.element('preferences-form')});
   assert.equal(app.calls.find(call=>call.command==='save_preferences').args.preferences.afterPlay,'closeLauncher');
+});
+
+test('AppImage offers installation while development previews stay untouched', async () => {
+  const preview = launcher({ checkUpdatesOnStartup: false }); await settle();
+  assert.equal(preview.element('launcher-installation').hidden, true);
+  assert.ok(!preview.element('install-launcher-dialog').open);
+  const image = launcher({ checkUpdatesOnStartup: false }, { installation: { installed: false, canInstall: true, offerInstall: true } }); await settle();
+  assert.equal(image.element('install-launcher-dialog').open, true);
+  assert.ok(!image.calls.some(call => call.command === 'install_launcher'));
+  await image.element('use-portable').listeners.click();
+  assert.ok(image.calls.some(call => call.command === 'keep_portable'));
+  assert.equal(image.element('install-launcher-dialog').open, false);
 });

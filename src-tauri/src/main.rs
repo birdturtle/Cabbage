@@ -1,4 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod game_host;
+mod installation;
 mod accounts;
 mod auth;
 mod clients;
@@ -740,26 +742,52 @@ async fn check_updates(
     updates::describe(release, &app.package_info().version.to_string())
 }
 
+fn installation_layout(app: &tauri::AppHandle) -> Result<installation::Layout, String> {
+    #[cfg(windows)] {
+        Ok(installation::Layout::windows(
+            &app.path().local_data_dir().map_err(|_| "Cannot locate installation directory.")?,
+            &app.path().data_dir().map_err(|_| "Cannot locate Start Menu directory.")?,
+        ))
+    }
+    #[cfg(not(windows))] {
+        Ok(installation::Layout::new(&app.path().data_dir().map_err(|_| "Cannot locate application directory.")?))
+    }
+}
+#[tauri::command]
+fn installation_status(window: WebviewWindow, app: tauri::AppHandle) -> Result<installation::Status, String> {
+    local(&window)?;
+    Ok(installation::status(&installation_layout(&app)?))
+}
+#[tauri::command]
+async fn install_launcher(window: WebviewWindow, app: tauri::AppHandle) -> Result<String, String> {
+    local(&window)?;
+    let layout = installation_layout(&app)?;
+    let source = installation::source().ok_or("Install Cabbage from its launcher download.")?;
+    tauri::async_runtime::spawn_blocking(move || installation::install(&layout, &source)).await.map_err(|_| "Installation failed.")??;
+    Ok(if cfg!(windows) { "Installed. Open Cabbage from the Start Menu." } else { "Installed. Open Cabbage from your application menu." }.into())
+}
+#[tauri::command]
+async fn uninstall_launcher(window: WebviewWindow, app: tauri::AppHandle) -> Result<String, String> {
+    local(&window)?;
+    let layout = installation_layout(&app)?;
+    let must_exit = tauri::async_runtime::spawn_blocking(move || installation::uninstall(&layout)).await.map_err(|_| "Uninstall failed.")??;
+    if must_exit { app.exit(0); }
+    Ok("Cabbage uninstalled. Saved accounts and games are kept.".into())
+}
+#[tauri::command]
+fn keep_portable(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    local(&window)?;
+    installation::keep_portable(&installation_layout(&app)?)
+}
+
 fn main() {
-    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--rs3-host")) {
-        let args: Vec<_> = std::env::args_os().collect();
-        let result = if args.len() == 4 {
-            rs3::host(
-                std::path::Path::new(&args[2]),
-                std::path::Path::new(&args[3]),
-            )
-        } else {
-            Err("Invalid RuneScape host invocation.".into())
-        };
-        match result {
-            Ok(code) => std::process::exit(code),
-            Err(error) => {
-                eprintln!("{error}");
-                std::process::exit(1);
-            }
+    #[cfg(windows)]
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--uninstall-launcher")) {
+        match installation::windows_cli_uninstall() {
+            Ok(()) => return,
+            Err(error) => { eprintln!("{error}"); std::process::exit(1); }
         }
     }
-
     // GTK's Wayland window ID derives from the program name, even when the
     // GtkApplication has its own ID. Match the installed desktop entry.
     #[cfg(target_os = "linux")]
@@ -816,6 +844,10 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            installation_status,
+            install_launcher,
+            uninstall_launcher,
+            keep_portable,
             launcher_status,
             launch_client,
             maintain_client,

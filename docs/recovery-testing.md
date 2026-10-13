@@ -24,6 +24,12 @@ The shared record writer previously moved current.json aside before activating t
 
 The stable release path previously depended on GitHub's latest-release endpoint and prerelease flag. Both channels now use the version-sorted Cabbage release listing, with stable checking the semantic prerelease suffix too. Metadata body size and per-request timeout are explicit.
 
+## Standalone game host
+
+The extracted helper passes startup protocol, malformed handoff and Linux process-lifetime tests. The Linux supervisor waits for a fixture game to exit, returns its exit status and removes its FIFOs. Helper installation verifies existing bytes and refuses to overwrite a damaged copy. The release helper links libc/libgcc only, with no GTK or WebKit dependencies. The launcher backend passes 67 tests; six live-download tests remain excluded from this run.
+
+Live RS3 launch/Close after Play and installed-package updates still need acceptance checks on both platforms.
+
 ## Remaining release checks
 
 Windows CI runs the non-network regression suite. Real Windows gameplay and installed-package recovery are still separate acceptance checks. Launcher self-update installation is not implemented; its signed upgrade, restart and recovery checks are prerequisites to release, documented in launcher-updates.md.

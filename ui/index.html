@@ -59,6 +59,11 @@
           <label class="preference-row"><input type="checkbox" name="includeBetaUpdates"><span>Include beta updates</span></label>
           <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
         </form>
+        <article class="panel" id="launcher-installation" hidden>
+          <h2>Installation</h2>
+          <p id="installation-message"></p>
+          <div class="action-row"><button class="button primary" id="install-launcher" hidden>Install Cabbage</button><button class="button" id="uninstall-launcher" hidden>Uninstall Cabbage</button></div>
+        </article>
         <p class="help-text">Closing the window hides the launcher to the tray. Tray Exit closes Cabbage.</p>
       </section>
     </div>
@@ -72,6 +77,16 @@
     <h2 id="uninstall-title">Uninstall client?</h2>
     <p>Remove this client's files? Saved accounts, game settings and caches are kept.</p>
     <div class="action-row"><button class="button" id="cancel-uninstall">Cancel</button><button class="button primary" id="confirm-uninstall">Uninstall</button></div>
+  </dialog>
+  <dialog id="install-launcher-dialog" aria-labelledby="install-launcher-title">
+    <h2 id="install-launcher-title">Install Cabbage?</h2>
+    <p id="install-launcher-description">Add Cabbage to your application menu.</p>
+    <div class="action-row"><button class="button" id="use-portable">Keep portable</button><button class="button primary" id="confirm-install-launcher">Install Cabbage</button></div>
+  </dialog>
+  <dialog id="uninstall-launcher-dialog" aria-labelledby="uninstall-launcher-title">
+    <h2 id="uninstall-launcher-title">Uninstall Cabbage?</h2>
+    <p>Saved accounts and games are kept.</p>
+    <div class="action-row"><button class="button" id="cancel-uninstall-launcher">Cancel</button><button class="button primary" id="confirm-uninstall-launcher">Uninstall</button></div>
   </dialog>
   <div class="toast" id="toast" role="status" hidden></div>
 </body>
