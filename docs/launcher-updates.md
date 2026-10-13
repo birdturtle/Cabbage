@@ -8,7 +8,7 @@ The release checker uses https://api.github.com/repos/birdturtle/Cabbage/release
 
 The GitHub repository is public. At audit time it has no published releases. Cabbage's Cargo, Tauri and npm versions are all 0.1.0. The application ID is com.birdturtle.cabbage and the protected account service is com.birdturtle.cabbage.jagex.v1. Remaining HapticScape mentions are source attribution, screenshot origin and legacy-settings rejection tests. No runtime HapticScape update endpoint or suite manifest is configured.
 
-Updates currently checks versions and displays notes. There is no Install update command, updater plugin/public key, signed launcher update artifact, or release packaging workflow. Tauri bundling is disabled; CI runs tests only. Development previews must remain outside installed-launcher update paths.
+Updates currently checks versions and displays notes. There is no Install update command, updater plugin/public key, signed launcher update artifact, or release packaging workflow. Linux AppImage bundling and a Windows standalone-EXE packaging workflow are implemented. Both include the game helper in the launcher executable. Packaging artifacts are workflow downloads, not published releases. Development previews must remain outside installed-launcher update paths.
 
 ## Package strategy
 
@@ -39,7 +39,7 @@ Keep the current launcher intact through download and signature verification. Re
 ## Implementation order
 
 1. Standalone versioned game host implemented; live Windows and installed-package acceptance remains.
-2. Linux AppImage and Windows standalone EXE packaging with installation identity/mode are implemented; Windows CI and installed-package acceptance must pass.
+2. Linux AppImage and Windows standalone EXE packaging with installation identity/mode are implemented; Windows/Linux regression CI passed; installed-package acceptance and live Windows checks remain.
 3. Configure a Cabbage signing key and release CI.
 4. Add the restricted Rust Install update command, progress/retry UI and restart handling.
 5. Test upgrade between signed RC packages, matching RC-to-stable selection, malformed metadata, wrong signatures/targets, network interruption, locked files, failed restart, running games and preserved accounts.

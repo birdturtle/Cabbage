@@ -9,3 +9,5 @@ Keep portable leaves the downloaded EXE in place without Start Menu or Installed
 Uninstall from Settings or Windows Installed Apps removes the installed launcher, its owned shortcut, icon and registration. Saved accounts, preferences and games are retained. When the installed EXE is running, a separate PowerShell worker waits for Cabbage to exit before deleting it. It never terminates games. If another process still locks the file, cleanup retries briefly and leaves registration intact if it cannot remove the binary.
 
 Build: `npm ci`, then `npm run build -- --no-bundle` on Windows. The Windows package workflow tests the backend and game helper and uploads one EXE as Cabbage-Windows-x64. Frontend resources, icon and game helper are embedded. Raw EXEs are not NSIS updater artifacts; signed replacement and recovery still need implementation before release.
+
+Verification: Windows CI passes native Start Menu/registration integration, install/reinstall/uninstall, and a cleanup worker waiting for a parent process to exit. Interactive Windows launcher/game acceptance remains outstanding.
