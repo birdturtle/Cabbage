@@ -27,7 +27,7 @@ Sign in with your Jagex account, choose a character and client, and press **Play
 - A running, unlocked desktop keyring with Secret Service support, such as GNOME Keyring or KWallet with Secret Service enabled.
 - XWayland when using a Wayland desktop.
 - Wine for the official Old School client.
-- SDL2, EGL and OpenGL libraries for RuneScape. On Arch and CachyOS, these are provided by [sdl2-compat](https://archlinux.org/packages/extra/x86_64/sdl2-compat/) and [libglvnd](https://archlinux.org/packages/extra/x86_64/libglvnd/), alongside your graphics drivers.
+- SDL2, EGL and OpenGL libraries for RuneScape.
 
 Cabbage downloads RuneLite's Java runtime and RuneScape's OpenSSL compatibility libraries automatically.
 
