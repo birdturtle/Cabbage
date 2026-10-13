@@ -6,7 +6,7 @@ The launcher source and history were extracted from HapticScape. Cabbage has its
 
 ## Development
 
-The source extraction and removal of inherited application controls are complete. Jagex sign-in, saved accounts, character selection, preferences, and tray behavior remain. RuneLite launch support is next. Play stays disabled until that integration is ready.
+The source extraction and removal of inherited application controls are complete. Jagex sign-in, saved accounts, character selection, preferences, and tray behavior remain. Play downloads the official RuneLite launcher and a Temurin Java 21 runtime, verifies their SHA256 checksums, renews the selected Jagex session, and launches the selected character. RuneLite handles its game-client updates. Windows and Linux are supported by the shared launch path.
 
 ```sh
 npm ci

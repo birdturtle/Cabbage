@@ -2,6 +2,7 @@ fn main() {
     let attributes = tauri_build::Attributes::new()
         .app_manifest(tauri_build::AppManifest::new().commands(&[
             "launcher_status",
+            "launch_runelite",
             "save_preferences",
             "begin_login",
             "cancel_login",

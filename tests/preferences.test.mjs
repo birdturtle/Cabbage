@@ -38,7 +38,7 @@ function launcher(preferences, options = {}) {
     document: { getElementById: element, querySelectorAll: () => [], createElement: () => element(`option:${Math.random()}`), createElementNS: () => element(`svg:${Math.random()}`) },
     setTimeout: () => 1, clearTimeout() {}, setInterval(callback) { poll = callback; },
   });
-  return { calls, element, poll: () => poll() };
+  return { calls, element, status, poll: () => poll() };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -98,4 +98,32 @@ test('release checks show notes and preserve failure feedback', async () => {
   await app.poll();
   assert.equal(app.element('update-message').textContent, 'Cannot reach GitHub.');
   assert.equal(app.element('release-notes').hidden, true);
+});
+
+test('Play passes only the selected account context to the backend and blocks duplicates', async () => {
+  const options = { status: { accounts: [{ id: 'saved', name: 'Player' }], selectedAccount: 'saved',
+    characters: [{ accountId: 'character', displayName: 'Player' }], selectedCharacter: 'character', clientRunning: false } };
+  const app = launcher({ checkUpdatesOnStartup: false }, options);
+  await settle();
+  assert.equal(Boolean(app.element('play').disabled), false);
+  await app.element('play').listeners.click();
+  assert.equal(app.calls.filter(call => call.command === 'launch_runelite').length, 1);
+  assert.deepEqual(Object.keys(app.calls.find(call => call.command === 'launch_runelite').args), []);
+  app.status.clientRunning = true;
+  await app.poll();
+  assert.equal(app.element('play').disabled, true);
+  await app.element('play').listeners.click();
+  assert.equal(app.calls.filter(call => call.command === 'launch_runelite').length, 1);
+});
+
+test('download progress and failed launch stay visible while polling', async () => {
+  const options = { status: { clientBusy: true, clientMessage: 'Downloading Java... 42%' } };
+  const app = launcher({ checkUpdatesOnStartup: false }, options);
+  await settle();
+  assert.equal(app.element('play').disabled, true);
+  assert.equal(app.element('play-hint').textContent, 'Downloading Java... 42%');
+  app.status.clientBusy = false;
+  app.status.clientMessage = 'RuneLite could not start. Retry the launch.';
+  await app.poll();
+  assert.equal(app.element('play-hint').textContent, 'RuneLite could not start. Retry the launch.');
 });

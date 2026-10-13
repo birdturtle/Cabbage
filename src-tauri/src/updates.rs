@@ -4,8 +4,10 @@ const REPOSITORY: &str = "birdturtle/Cabbage";
 #[derive(Clone, Deserialize)]
 pub struct GitHubRelease {
     pub tag_name: String,
-    #[serde(default)] pub draft: bool,
-    #[serde(default)] pub prerelease: bool,
+    #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub prerelease: bool,
     pub name: Option<String>,
     pub body: Option<String>,
     pub published_at: Option<String>,
@@ -52,9 +54,7 @@ pub async fn latest(http: &reqwest::Client, beta: bool) -> Result<GitHubRelease,
                 .header("User-Agent", "Cabbage")
                 .send()
                 .await
-                .map_err(|_| {
-                    "Cannot reach GitHub. Try again later.".to_string()
-                })?
+                .map_err(|_| "Cannot reach GitHub. Try again later.".to_string())?
                 .error_for_status()
                 .map_err(|_| "GitHub could not return releases.".to_string())?
                 .json()
@@ -77,7 +77,9 @@ pub async fn latest(http: &reqwest::Client, beta: bool) -> Result<GitHubRelease,
     .await
     .map_err(|_| "Cannot reach GitHub. Try again later.".to_string())?
     .error_for_status()
-    .map_err(|_| "No published Cabbage release is available, or GitHub could not return it.".to_string())?
+    .map_err(|_| {
+        "No published Cabbage release is available, or GitHub could not return it.".to_string()
+    })?
     .json()
     .await
     .map_err(|_| "GitHub returned invalid release information.".into())
@@ -92,24 +94,54 @@ pub fn describe(release: GitHubRelease, installed: &str) -> Result<Release, Stri
         published_at: release.published_at.unwrap_or_default(),
         installed_version: installed.into(),
         available,
-        message: if available { "A newer Cabbage release is available." } else { "You have the latest version." }.into(),
+        message: if available {
+            "A newer Cabbage release is available."
+        } else {
+            "You have the latest version."
+        }
+        .into(),
     })
 }
 #[cfg(test)]
 mod tests {
     use super::*;
     fn release(tag: &str, prerelease: bool, draft: bool) -> GitHubRelease {
-        GitHubRelease { tag_name: tag.into(), prerelease, draft, name: None, body: None, published_at: None }
+        GitHubRelease {
+            tag_name: tag.into(),
+            prerelease,
+            draft,
+            name: None,
+            body: None,
+            published_at: None,
+        }
     }
     #[test]
     fn stable_supersedes_matching_rc_and_drafts_are_excluded() {
-        let releases = vec![release("v1.0.0-rc.1", true, false), release("v1.0.0", false, false), release("v2.0.0", false, true)];
-        assert_eq!(select_release(releases.clone(), true).unwrap().tag_name, "v1.0.0");
+        let releases = vec![
+            release("v1.0.0-rc.1", true, false),
+            release("v1.0.0", false, false),
+            release("v2.0.0", false, true),
+        ];
+        assert_eq!(
+            select_release(releases.clone(), true).unwrap().tag_name,
+            "v1.0.0"
+        );
         assert_eq!(select_release(releases, false).unwrap().tag_name, "v1.0.0");
     }
     #[test]
     fn beta_channel_can_select_a_newer_beta() {
-        assert_eq!(select_release(vec![release("v1.0.0", false, false), release("v1.1.0-beta.1", true, false)], true).unwrap().tag_name, "v1.1.0-beta.1");
+        assert_eq!(
+            select_release(
+                vec![
+                    release("v1.0.0", false, false),
+                    release("v1.1.0-beta.1", true, false)
+                ],
+                true
+            )
+            .unwrap()
+            .tag_name,
+            "v1.1.0-beta.1"
+        );
     }
     #[test]
     fn malformed_and_empty_feeds_fail_closed() {

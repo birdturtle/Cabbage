@@ -1,20 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod accounts;
 mod auth;
+mod runelite;
 mod settings;
 mod storage;
 mod tray;
 mod updates;
 
 use auth::{AccountState, Callback, Phase};
-use settings::{Preferences, Settings};
 use serde::Serialize;
-use std::{
-    fs,
-    path::PathBuf,
-    sync::Mutex,
-    time::Duration,
-};
+use settings::{Preferences, Settings};
+use std::{fs, path::PathBuf, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 struct AppState {
@@ -22,6 +18,7 @@ struct AppState {
     account: Mutex<AccountState>,
     wallet: Mutex<()>,
     http: reqwest::Client,
+    runelite: Mutex<runelite::State>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +33,10 @@ struct Status {
     needs_sign_in: bool,
     account_message: String,
     platform: &'static str,
+    client_running: bool,
+    client_busy: bool,
+    client_message: String,
+    client_version: Option<String>,
     installed_version: String,
 }
 
@@ -73,7 +74,12 @@ async fn launcher_status(
     local(&window)?;
     let settings = state.settings.lock().unwrap().clone();
     let account = state.account.lock().unwrap();
+    let mut client = state.runelite.lock().unwrap();
     Ok(Status {
+        client_running: client.running(),
+        client_busy: client.busy,
+        client_message: client.message.clone(),
+        client_version: runelite::installed(&client_root(&app)?).map(|i| i.version),
         accounts: account
             .book
             .accounts
@@ -132,7 +138,6 @@ fn persist_settings(app: &tauri::AppHandle, settings: &Settings) -> Result<(), S
 
 // The wallet lock serializes refresh-token rotation with login, switching and
 // removal. No account/process mutex is held across network requests.
-#[allow(dead_code)] // Used when RuneLite launch integration is added.
 fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String> {
     let state = app.state::<AppState>();
     let _wallet = state.wallet.lock().unwrap();
@@ -183,6 +188,62 @@ fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String>
         ("JX_CHARACTER_ID".into(), character.account_id.clone()),
         ("JX_DISPLAY_NAME".into(), character.display_name.clone()),
     ])
+}
+
+fn client_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|p| p.join("clients/runelite"))
+        .map_err(|_| "Cannot locate the RuneLite data directory.".into())
+}
+
+#[tauri::command]
+async fn launch_runelite(window: WebviewWindow, app: tauri::AppHandle) -> Result<String, String> {
+    local(&window)?;
+    let state = app.state::<AppState>();
+    {
+        let mut client = state.runelite.lock().unwrap();
+        if client.busy {
+            return Err("RuneLite is already starting.".into());
+        }
+        if client.running() {
+            return Ok("RuneLite is already running.".into());
+        }
+        client.busy = true;
+        client.message = "Preparing RuneLite...".into();
+    }
+    let handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let state = handle.state::<AppState>();
+        let credentials = prepare_play(&handle)?;
+        let root = client_root(&handle)?;
+        let install = tauri::async_runtime::block_on(runelite::ensure(&root, &state.runelite))?;
+        let child = runelite::spawn(&root, &install, &credentials)?;
+        let mut client = state.runelite.lock().unwrap();
+        client.child = Some(child);
+        client.message = "RuneLite is running.".into();
+        Ok(())
+    })
+    .await;
+    let result = result
+        .map_err(|_| "The RuneLite launch task failed.".to_string())
+        .and_then(|r| r);
+    {
+        let mut client = state.runelite.lock().unwrap();
+        client.busy = false;
+        if let Err(error) = &result {
+            client.message = error.clone();
+        }
+    }
+    result?;
+    if state.settings.lock().unwrap().preferences.minimize_on_play {
+        if tray::available(&app) {
+            let _ = window.hide();
+        } else {
+            let _ = window.minimize();
+        }
+    }
+    Ok("RuneLite launched.".into())
 }
 
 fn login_failure(app: &tauri::AppHandle, attempt_id: &str, message: String) {
@@ -548,6 +609,7 @@ fn main() {
                 settings: Mutex::new(settings),
                 account: Mutex::new(AccountState::default()),
                 wallet: Mutex::new(()),
+                runelite: Mutex::new(runelite::State::default()),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
                     .redirect(reqwest::redirect::Policy::none())
@@ -571,6 +633,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             launcher_status,
+            launch_runelite,
             save_preferences,
             begin_login,
             cancel_login,
