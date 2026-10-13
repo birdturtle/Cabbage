@@ -78,7 +78,9 @@ The bootstrap links OpenSSL 1.1, GTK 2, X11 and related libraries. This developm
 
 Binary strings show `--configURI`, a `codebase` setting, binary counts/names, and additional client download requests. This artifact is a bootstrap, not proof that the full game is bundled or launches. The actual game's session handling, update integrity, SDL/Wayland requirements, and process lifetime remain to be probed.
 
-The embedded default configuration URI and common legacy configuration URIs returned HTTP 404 during research. Do not hardcode them as a verified working configuration. Revisit the current server contract during RS3 implementation.
+Requests without a binary type returned HTTP 404. A follow-up probe succeeded with `https://rs.config.runescape.com/k=5/l=0/jav_config.ws?binaryType=2`, and the corresponding www.runescape.com URL also responded. That response selects Windows `rs2client.exe`, with launcher version 224, subversion 1, server version 950, and `download_crc_0` / `download_hash_0` fields. The codebase comes from the response and must not be hardcoded to the observed world server.
+
+This establishes a working Windows configuration response, not the correct Linux binary type or successful gameplay. Verify the bootstrap's platform selection, hash/signature interpretation, native Linux response, and actual game executable handoff before implementation. Do not pass the Windows binary type to the Linux adapter.
 
 ## Implementation order
 
