@@ -59,6 +59,7 @@ fn run(mut command: Command) -> Result<(), String> {
 }
 const INTEGRATE: &str = r#"
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 $binary=$env:CABBAGE_INSTALL_BINARY
 $shortcut=$env:CABBAGE_INSTALL_SHORTCUT
 $shell=New-Object -ComObject WScript.Shell
@@ -81,7 +82,14 @@ pub fn integrate(layout: &Layout) -> Result<String, String> {
     Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 const CLEANUP: &str = r#"
+function Get-CabbageFileHash([string]$path){
+  $sha=[System.Security.Cryptography.SHA256]::Create()
+  $stream=[System.IO.File]::OpenRead($path)
+  try{[BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant()}
+  finally{$stream.Dispose();$sha.Dispose()}
+}
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 if($env:CABBAGE_UNINSTALL_PID){
   try{$parent=[System.Diagnostics.Process]::GetProcessById([int]$env:CABBAGE_UNINSTALL_PID)}catch{$parent=$null}
   if($parent -and -not $parent.WaitForExit(30000)){exit 1}
@@ -93,9 +101,9 @@ for($attempt=0;$attempt -lt 40;$attempt++){
 }
 if(-not $removed){exit 1}
 $shortcut=$env:CABBAGE_INSTALL_SHORTCUT
-if((Test-Path -LiteralPath $shortcut) -and (Get-FileHash -LiteralPath $shortcut -Algorithm SHA256).Hash -eq $env:CABBAGE_SHORTCUT_HASH){Remove-Item -LiteralPath $shortcut -Force}
+if((Test-Path -LiteralPath $shortcut) -and (Get-CabbageFileHash $shortcut) -eq $env:CABBAGE_SHORTCUT_HASH){Remove-Item -LiteralPath $shortcut -Force}
 $icon=$env:CABBAGE_INSTALL_ICON
-if((Test-Path -LiteralPath $icon) -and (Get-FileHash -LiteralPath $icon -Algorithm SHA256).Hash -eq $env:CABBAGE_ICON_HASH){Remove-Item -LiteralPath $icon -Force}
+if((Test-Path -LiteralPath $icon) -and (Get-CabbageFileHash $icon) -eq $env:CABBAGE_ICON_HASH){Remove-Item -LiteralPath $icon -Force}
 $key=$env:CABBAGE_INSTALL_KEY
 if(Test-Path -LiteralPath $key){
   if((Get-ItemProperty -LiteralPath $key).InstallLocation -eq $env:CABBAGE_INSTALL_ROOT){Remove-Item -LiteralPath $key -Recurse -Force}
