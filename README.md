@@ -6,6 +6,8 @@ Sign in with your Jagex account, choose a character and client, and press **Play
 
 [Download Cabbage](https://github.com/birdturtle/Cabbage/releases/latest)
 
+![Cabbage launcher](docs/images/cabbage-launcher.png)
+
 ## Clients
 
 | Client | Windows | Linux |
