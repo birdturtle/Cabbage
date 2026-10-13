@@ -38,6 +38,8 @@ fn command(layout: &Layout, script: &str) -> Command {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    #[cfg(test)]
+    command.stderr(Stdio::inherit());
     crate::clients::configure_credentials(&mut command, &[]);
     command
 }
