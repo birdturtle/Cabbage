@@ -64,6 +64,18 @@ Open **Updates**, select **Check for updates**, then **Install update and restar
 
 Updates work with installed and portable copies. Your accounts, settings and downloaded clients are kept, and running games stay open.
 
+## Data locations
+
+Cabbage stores saved data in these folders, including when you choose **Keep portable**:
+
+| Files | Windows | Linux |
+| --- | --- | --- |
+| Accounts and settings | `%APPDATA%\com.birdturtle.cabbage` | `~/.config/com.birdturtle.cabbage` |
+| Downloaded clients and app data | `%APPDATA%\com.birdturtle.cabbage` | `~/.local/share/com.birdturtle.cabbage` |
+| Installed launcher | `%LOCALAPPDATA%\cabbage\launcher` | `~/.local/share/cabbage/launcher` |
+
+Linux paths follow `XDG_CONFIG_HOME` and `XDG_DATA_HOME` if you have changed those locations. Portable copies keep the launcher file where you put it.
+
 ## Uninstall
 
 Use the installation section in **Settings** to uninstall Cabbage. On Windows, you can also use **Installed Apps**.
