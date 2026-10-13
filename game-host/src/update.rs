@@ -117,6 +117,7 @@ fn launch(plan: &Plan, ack: Option<&Path>) -> Result<std::process::Child, String
         "CABBAGE_UPDATE_TOKEN",
         "CABBAGE_UPDATE_VERSION",
         "CABBAGE_UPDATE_TARGET",
+        "CABBAGE_UPDATE_ROLLBACK",
     ] {
         command.env_remove(name);
     }
@@ -131,6 +132,9 @@ fn launch(plan: &Plan, ack: Option<&Path>) -> Result<std::process::Child, String
             .env("CABBAGE_UPDATE_TOKEN", &plan.token)
             .env("CABBAGE_UPDATE_VERSION", &plan.version)
             .env("CABBAGE_UPDATE_TARGET", &plan.target);
+    }
+    if ack.is_none() {
+        command.env("CABBAGE_UPDATE_ROLLBACK", "1");
     }
     #[cfg(windows)]
     {
@@ -211,6 +215,9 @@ pub fn run(path: &Path) -> Result<(), String> {
     let result = replace(&plan);
     if let Err(error) = &result {
         let _ = fs::write(plan.target.with_extension("update-error"), error);
+        if regular(&plan.target) && digest(&plan.target).is_ok_and(|hash| hash != plan.sha256) {
+            let _ = launch(&plan, None);
+        }
     }
     let _ = fs::remove_file(path);
     let _ = fs::remove_file(&plan.staged);
@@ -283,21 +290,44 @@ mod tests {
     }
     #[test]
     fn worker_acknowledges_readiness_and_waits_for_parent_before_replacement() {
-        let root = std::env::temp_dir().join(format!("cabbage parent wait {}", std::process::id())); fs::create_dir_all(&root).unwrap();
-        let target = fixture(&root,"old","old"); let old = fs::read(&target).unwrap();
-        let staged = fixture(&root,"new","ack"); let parent = fixture(&root,"parent","parent");
+        let root = std::env::temp_dir().join(format!("cabbage parent wait {}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let target = fixture(&root, "old", "old");
+        let old = fs::read(&target).unwrap();
+        let staged = fixture(&root, "new", "ack");
+        let parent = fixture(&root, "parent", "parent");
         let mut child = Command::new(parent).spawn().unwrap();
-        let plan = Plan { target:target.clone(), sha256:digest(&staged).unwrap(), staged:staged.clone(), parent:child.id(), version:"test".into(), token:"a".repeat(64) };
-        let path = companion(&staged,"plan"); fs::write(&path,serde_json::to_vec(&plan).unwrap()).unwrap();
+        let plan = Plan {
+            target: target.clone(),
+            sha256: digest(&staged).unwrap(),
+            staged: staged.clone(),
+            parent: child.id(),
+            version: "test".into(),
+            token: "a".repeat(64),
+        };
+        let path = companion(&staged, "plan");
+        fs::write(&path, serde_json::to_vec(&plan).unwrap()).unwrap();
         let worker = std::thread::spawn(move || run(&path));
         let deadline = Instant::now() + Duration::from_secs(5);
-        while !companion(&staged,"ready").exists() && Instant::now() < deadline { std::thread::sleep(Duration::from_millis(10)); }
-        assert_eq!(fs::read(companion(&staged,"ready")).unwrap(),plan.token.as_bytes());
-        assert_eq!(fs::read(&target).unwrap(),old);
-        child.wait().unwrap(); worker.join().unwrap().unwrap();
-        assert_eq!(fs::read(target.with_extension("previous")).unwrap(),old);
-        assert!(!companion(&staged,"plan").exists()); assert!(!companion(&staged,"ready").exists());
-        for _ in 0..50 { if fs::remove_dir_all(&root).is_ok() { break; } std::thread::sleep(Duration::from_millis(20)); }
+        while !companion(&staged, "ready").exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            fs::read(companion(&staged, "ready")).unwrap(),
+            plan.token.as_bytes()
+        );
+        assert_eq!(fs::read(&target).unwrap(), old);
+        child.wait().unwrap();
+        worker.join().unwrap().unwrap();
+        assert_eq!(fs::read(target.with_extension("previous")).unwrap(), old);
+        assert!(!companion(&staged, "plan").exists());
+        assert!(!companion(&staged, "ready").exists());
+        for _ in 0..50 {
+            if fs::remove_dir_all(&root).is_ok() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
         assert!(!root.exists());
     }
     #[test]

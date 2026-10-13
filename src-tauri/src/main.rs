@@ -755,10 +755,11 @@ async fn check_updates(
 fn acknowledge_update(window: WebviewWindow, app: tauri::AppHandle) -> Result<Option<String>, String> {
     local_origin(&window)?;
     let layout = installation_layout(&app)?;
-    if cfg!(windows) && std::env::var_os("CABBAGE_UPDATE_ACK").is_some() && installation::status(&layout).running_installed {
+    if cfg!(windows) && (std::env::var_os("CABBAGE_UPDATE_ACK").is_some() || std::env::var_os("CABBAGE_UPDATE_ROLLBACK").is_some()) && installation::status(&layout).running_installed {
         if let Some(source) = installation::source() { installation::install(&layout, &source)?; }
     }
     update_install::acknowledge_startup();
+    std::env::remove_var("CABBAGE_UPDATE_ROLLBACK");
     let error = installation::source().map(|p| p.with_extension("update-error"));
     let message = error.as_ref().and_then(|p| fs::read_to_string(p).ok()).filter(|s| s.len() < 4096);
     if let Some(path) = error { let _ = fs::remove_file(path); }
