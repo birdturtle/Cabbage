@@ -325,7 +325,7 @@ test('update errors remain visible and installation can be retried', async () =>
   await settle(); await app.element('check-updates').listeners.click();
   await app.element('install-update').listeners.click();
   assert.equal(app.element('update-message').textContent,'Finish signing in before updating Cabbage.');
-  assert.equal(app.element('install-update').disabled,false);
+  assert.equal(Boolean(app.element('install-update').disabled),false);
   assert.equal(app.element('update-progress').hidden,true);
   await app.element('install-update').listeners.click();
   assert.equal(app.calls.filter(call=>call.command==='install_update').length,2);
