@@ -781,19 +781,23 @@ fn keep_portable(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), Str
 }
 
 fn main() {
-    #[cfg(windows)]
-    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--uninstall-launcher")) {
-        match installation::windows_cli_uninstall() {
-            Ok(()) => return,
-            Err(error) => { eprintln!("{error}"); std::process::exit(1); }
-        }
-    }
     // GTK's Wayland window ID derives from the program name, even when the
     // GtkApplication has its own ID. Match the installed desktop entry.
     #[cfg(target_os = "linux")]
     gtk::glib::set_prgname(Some("com.birdturtle.cabbage"));
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            #[cfg(windows)]
+            if args.iter().any(|arg| arg == "--uninstall-launcher") {
+                let app = app.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    match installation_layout(&app).and_then(|layout| installation::uninstall(&layout)) {
+                        Ok(_) => app.exit(0),
+                        Err(error) => eprintln!("{error}"),
+                    }
+                });
+                return;
+            }
             let _ = args;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -802,6 +806,14 @@ fn main() {
             }
         }))
         .setup(|app| {
+            #[cfg(windows)]
+            if std::env::args_os().any(|arg| arg == "--uninstall-launcher") {
+                if let Some(window) = app.get_webview_window("main") { let _ = window.hide(); }
+                let layout = installation_layout(app.handle())?;
+                installation::uninstall(&layout)?;
+                app.exit(0);
+                return Ok(());
+            }
             #[cfg(target_os = "linux")]
             {
                 use gtk::prelude::*;

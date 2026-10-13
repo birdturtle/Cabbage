@@ -338,14 +338,3 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
-
-#[cfg(windows)]
-pub fn windows_cli_uninstall() -> Result<(), String> {
-    let local = PathBuf::from(
-        std::env::var_os("LOCALAPPDATA").ok_or("Cannot locate installation directory.")?,
-    );
-    let roaming =
-        PathBuf::from(std::env::var_os("APPDATA").ok_or("Cannot locate Start Menu directory.")?);
-    uninstall(&Layout::windows(&local, &roaming))?;
-    Ok(())
-}
