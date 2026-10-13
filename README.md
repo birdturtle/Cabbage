@@ -14,6 +14,23 @@ Sign in with your Jagex account, choose a character and client, and press **Play
 | Official Old School RuneScape | Native | Requires Wine |
 | RuneScape | Native | Native |
 
+## Dependencies
+
+### Windows
+
+- [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) for the launcher.
+- [Microsoft Visual C++ Redistributable x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) for the official Old School client.
+
+### Linux
+
+- [FUSE support](https://docs.appimage.org/user-guide/troubleshooting/fuse.html) to run the AppImage.
+- A running, unlocked desktop keyring with Secret Service support, such as GNOME Keyring or KWallet with Secret Service enabled.
+- XWayland when using a Wayland desktop.
+- Wine for the official Old School client.
+- SDL2, EGL and OpenGL libraries for RuneScape. On Arch and CachyOS, these are provided by [sdl2-compat](https://archlinux.org/packages/extra/x86_64/sdl2-compat/) and [libglvnd](https://archlinux.org/packages/extra/x86_64/libglvnd/), alongside your graphics drivers.
+
+Cabbage downloads RuneLite's Java runtime and RuneScape's OpenSSL compatibility libraries automatically.
+
 ## Install
 
 Download the file for your system from the [latest release](https://github.com/birdturtle/Cabbage/releases/latest). Both downloads are for x64 systems.
@@ -23,7 +40,7 @@ Download the file for your system from the [latest release](https://github.com/b
 1. Open `Cabbage-Windows-x64-1.0.0.exe`.
 2. Choose **Install Cabbage** to add it to your Start Menu, or **Keep portable** to run it from the downloaded file.
 
-Installation does not require administrator access. [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) is required if it is not already installed.
+Installation does not require administrator access.
 
 ### Linux
 
@@ -35,8 +52,6 @@ chmod +x Cabbage-Linux-x64-1.0.0.AppImage
 ```
 
 Choose **Install Cabbage** to add it to your application menu, or **Keep portable**. Installation does not require sudo.
-
-Saved accounts require a desktop keyring with Secret Service support. Install Wine if you want to use the official Old School client. RuneLite includes its Java runtime.
 
 ## Play
 
