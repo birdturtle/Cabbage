@@ -52,7 +52,7 @@ async function action(command, args = {}) {
 }
 
 function render() {
-  document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
+  document.querySelectorAll('button').forEach((button) => { if (button.id !== 'play') button.disabled = busy && !button.dataset.page && !button.dataset.go; });
 
   setText('check-updates', checkingUpdates ? 'Checking…' : 'Check for updates');
   if (!status) { $('play').disabled = true; return; }
@@ -61,7 +61,8 @@ function render() {
   setText('launch-title', selectedGame === 'oldschool' ? 'Old School RuneScape' : 'RuneScape');
   const clientName = choices.find(client => client.id === status.selectedClient)?.name || '';
   const character = status.characters.some(item => item.accountId === status.selectedCharacter);
-  $('play').disabled = busy || selectingClient || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
+  const playDisabled = Boolean(busy || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn);
+  if ($('play').disabled !== playDisabled) $('play').disabled = playDisabled;
   setText('play', status.clientBusy ? 'Please wait…' : 'Play');
   const activity = status.clients.find(client => client.id === status.selectedClient && client.busy) || status.clients.find(client => client.busy);
   const preparing = Boolean(status.clientBusy || activity);

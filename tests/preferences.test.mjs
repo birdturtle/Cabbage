@@ -261,3 +261,14 @@ test('preparation progress shows percentage, switches to setup, and clears on co
   app.status.clients[2].busy=true; app.status.clients[2].message='Downloading RuneScape... 40%'; await app.poll();
   assert.equal(app.element('client-progress-fill').style.width,'40%');
 });
+
+test('Play stays visually enabled while an available client selection is saving', async () => {
+  let release; const gate=new Promise(resolve=>{release=resolve;});
+  const app=launcher({checkUpdatesOnStartup:false},{selectionGate:gate,status:{characters:[{accountId:'character',displayName:'Player'}],selectedCharacter:'character'}});
+  await settle(); assert.equal(app.element('play').disabled,false);
+  const selection=app.element('client-officialRs3').listeners.click();
+  assert.equal(app.element('play').disabled,false);
+  await app.poll(); assert.equal(app.element('play').disabled,false);
+  release(); await selection;
+  assert.equal(app.element('play').disabled,false);
+});
