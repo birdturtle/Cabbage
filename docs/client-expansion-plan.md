@@ -4,7 +4,7 @@
 
 Launch RuneLite, the current official OSRS client, and RS3 from Cabbage on Windows and Linux using the selected Jagex account and character. Cabbage owns installation, updates, and launch preparation; users should not need to install another launcher to play.
 
-On 2026-10-12 the user confirmed Jagex login and RuneLite launch on Linux after reboot. This is one successful live test, not proof that the earlier Cloudflare loop is resolved everywhere. Preserve the current uncommitted authentication changes and working browser profile while expanding client support. Windows login and gameplay still require live acceptance.
+On 2026-10-12 the user confirmed Jagex login and RuneLite launch on Linux after reboot. This is one successful live test, not proof that the earlier Cloudflare loop is resolved everywhere. Preserve the committed authentication changes at `3496ddd` and the working browser profile while expanding client support. Windows login and gameplay still require live acceptance.
 
 ## Target matrix
 
@@ -68,3 +68,7 @@ Existing installation import, HDOS, Steam linking, custom executables, and adopt
 ## Current primary reference
 
 Jagex's [launcher and client download links](https://support.runescape.com/hc/en-gb/articles/44160372424849-Jagex-Launcher-and-Game-Client-download-links), checked 2026-10-12, list a Linux launcher beta. This confirms launcher availability, not the OSRS client's Linux implementation or its authentication contract. Phase 1 must verify those details.
+
+## Research progress
+
+See [official-client-contracts.md](official-client-contracts.md) for the inspected Jagex Linux beta, verified OSRS content reconstruction, and RS3 bootstrap/dependency findings. Static research is complete for these artifacts; isolated runtime probes and authenticated Windows/Linux acceptance remain outstanding. The next implementation step is the shared manager with RuneLite regression coverage.
