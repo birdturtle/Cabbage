@@ -39,6 +39,8 @@ function launcher(preferences, options = {}) {
         if (options.checkError) throw options.checkError;
         return options.release || { tag: 'v1', name: 'Release', notes: 'Notes' };
       }
+      if (command === 'install_update' && options.installError) throw options.installError;
+      if (command === 'update_progress') return {busy:false,message:options.installError || ''};
       if (command === 'select_client') {
         if(options.selectionGate) await options.selectionGate;
         status.settings.selectedGame = args.game;
@@ -315,4 +317,16 @@ test('release update button requires an upgrade and a packaged launcher', async 
     assert.equal(app.element('install-update').hidden,hidden);
     assert.ok(!app.calls.some(call=>call.command==='install_update'));
   }
+});
+
+
+test('update errors remain visible and installation can be retried', async () => {
+  const app=launcher({checkUpdatesOnStartup:false},{release:{tag:'v0.1.0-rc.3',available:true},installation:{canInstall:true},installError:'Finish signing in before updating Cabbage.'});
+  await settle(); await app.element('check-updates').listeners.click();
+  await app.element('install-update').listeners.click();
+  assert.equal(app.element('update-message').textContent,'Finish signing in before updating Cabbage.');
+  assert.equal(app.element('install-update').disabled,false);
+  assert.equal(app.element('update-progress').hidden,true);
+  await app.element('install-update').listeners.click();
+  assert.equal(app.calls.filter(call=>call.command==='install_update').length,2);
 });

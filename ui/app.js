@@ -43,7 +43,7 @@ async function action(command, args = {}) {
     return result;
   } catch (error) {
     toast(error, true);
-    if (command === 'check_updates') {
+    if (command === 'check_updates' || command === 'install_update') {
       updateFeedback = true;
       $('update-message').textContent = String(error);
       if (command === 'check_updates') $('release-summary').textContent = 'Update check failed. Try again.';
@@ -282,8 +282,6 @@ $('install-update').addEventListener('click', async () => {
   }, 250);
   try {
     await action('install_update');
-    const progress = await invoke('update_progress');
-    $('update-message').textContent = progress.message;
   } finally { clearInterval(timer); $('update-progress').hidden = true; }
 });
 $('check-updates').addEventListener('click', checkUpdates);
