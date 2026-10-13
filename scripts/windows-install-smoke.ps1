@@ -12,7 +12,7 @@ $env:CABBAGE_INSTALL_ROOT = Join-Path $cabbageTestRoot 'cabbage/launcher'
 $env:CABBAGE_INSTALL_BINARY = Join-Path $env:CABBAGE_INSTALL_ROOT 'Cabbage.exe'
 $env:CABBAGE_INSTALL_SHORTCUT = Join-Path $cabbageTestRoot 'Start Menu/Programs/Cabbage.lnk'
 $env:CABBAGE_INSTALL_ICON = Join-Path $env:CABBAGE_INSTALL_ROOT 'Cabbage.ico'
-$env:CABBAGE_INSTALL_VERSION = '0.1.0'
+$env:CABBAGE_INSTALL_VERSION = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
 $env:CABBAGE_INSTALL_KEY = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Cabbage.Smoke.' + [guid]::NewGuid()
 try {
     New-Item -ItemType Directory -Path $env:CABBAGE_INSTALL_ROOT -Force | Out-Null

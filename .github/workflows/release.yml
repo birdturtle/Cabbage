@@ -1,0 +1,68 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      notes: ${{ steps.version.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify release version
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/verify-release.py "$RELEASE_TAG"
+  linux:
+    needs: validate
+    uses: ./.github/workflows/package-linux.yml
+  windows:
+    needs: validate
+    uses: ./.github/workflows/package-windows.yml
+  publish:
+    needs: [validate, linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Cabbage-*-x64
+          path: artifacts
+          merge-multiple: true
+      - name: Prepare release assets
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(artifacts/*.AppImage)
+          executables=(artifacts/*.exe)
+          test "${#images[@]}" -eq 1
+          test "${#executables[@]}" -eq 1
+          mkdir -p build/release
+          cp "${images[0]}" "build/release/Cabbage-Linux-x64-$RELEASE_VERSION.AppImage"
+          cp "${executables[0]}" "build/release/Cabbage-Windows-x64-$RELEASE_VERSION.exe"
+          cd build/release
+          sha256sum *.AppImage *.exe > SHA256SUMS.txt
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_NOTES: ${{ needs.validate.outputs.notes }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease --latest=false); fi
+          gh release create "$RELEASE_TAG" build/release/* --verify-tag --title "Cabbage $RELEASE_VERSION" --notes-file "$RELEASE_NOTES" "${flags[@]}"

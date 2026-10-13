@@ -292,3 +292,17 @@ test('AppImage offers installation while development previews stay untouched', a
   assert.ok(image.calls.some(call => call.command === 'keep_portable'));
   assert.equal(image.element('install-launcher-dialog').open, false);
 });
+
+test('a downloaded build can replace an existing installation', async () => {
+  const app = launcher({ checkUpdatesOnStartup: false }, { installation: { installed: true, runningInstalled: false, canInstall: true, offerInstall: true } });
+  await settle();
+  assert.equal(app.element('install-launcher').hidden, false);
+  assert.equal(app.element('install-launcher-dialog').open, true);
+  assert.ok(!app.calls.some(call => call.command === 'install_launcher'));
+  await app.element('confirm-install-launcher').listeners.click();
+  assert.ok(app.calls.some(call => call.command === 'install_launcher'));
+  const installed = launcher({ checkUpdatesOnStartup: false }, { installation: { installed: true, runningInstalled: true, canInstall: true, offerInstall: false } });
+  await settle();
+  assert.equal(installed.element('install-launcher').hidden, true);
+  assert.ok(!installed.element('install-launcher-dialog').open);
+});

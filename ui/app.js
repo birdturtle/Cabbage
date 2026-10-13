@@ -287,7 +287,7 @@ async function refreshInstallation(offer = false) {
     const installation = await invoke('installation_status');
     $('launcher-installation').hidden = !installation.canInstall && !installation.installed;
     setText('install-launcher-description', status?.platform === 'windows' ? 'Add Cabbage to your Start Menu.' : 'Add Cabbage to your application menu.');
-    $('install-launcher').hidden = !installation.canInstall || installation.installed;
+    $('install-launcher').hidden = !installation.canInstall || installation.runningInstalled;
     $('uninstall-launcher').hidden = !installation.installed;
     setText('installation-message', installation.installed ? 'Cabbage is installed for your user account.' : 'Run portably or add Cabbage to your application menu.');
     if (offer && installation.offerInstall) $('install-launcher-dialog').showModal();

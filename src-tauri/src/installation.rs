@@ -20,6 +20,7 @@ const ID: &str = "com.birdturtle.cabbage";
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     pub installed: bool,
+    pub running_installed: bool,
     pub can_install: bool,
     pub offer_install: bool,
 }
@@ -187,11 +188,18 @@ fn valid_source(path: &Path) -> bool {
 }
 pub fn status(layout: &Layout) -> Status {
     let installed = layout.installed();
-    let can_install = source().is_some();
+    let source = source();
+    let can_install = source.is_some();
+    let running_installed = installed
+        && source.as_ref().and_then(|path| fs::canonicalize(path).ok())
+            == fs::canonicalize(layout.binary()).ok();
     Status {
         installed,
+        running_installed,
         can_install,
-        offer_install: can_install && !installed && !layout.root.join("portable.json").exists(),
+        offer_install: can_install
+            && !running_installed
+            && !layout.root.join("portable.json").exists(),
     }
 }
 pub fn keep_portable(layout: &Layout) -> Result<(), String> {

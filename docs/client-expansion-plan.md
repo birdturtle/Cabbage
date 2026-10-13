@@ -75,14 +75,14 @@ See [official-client-contracts.md](official-client-contracts.md) for the inspect
 
 ## Shared manager milestone
 
-The shared registry/manager and game/client selectors are implemented with RuneLite as the active adapter. Official OSRS is implemented and the user confirmed Linux launching. Official RS3 is implemented for testing. See client-manager.md. Existing RuneLite paths and account/browser state are preserved. Regression tests pass locally; live launch through the manager is the next acceptance check.
+The shared registry/manager and bottom-row client selection are implemented. Official OSRS is implemented and the user confirmed Linux launching. Official RS3 is implemented for testing. See client-manager.md. Existing RuneLite paths and account/browser state are preserved. Regression tests pass on Windows and Linux; the user confirmed Linux launches for all three clients.
 
 ## RS3 adapter milestone
 
 The Linux adapter downloads binaryType=4 from the current Jagex configuration, checks the decompressed client against the published CRC, and installs private pinned OpenSSL 1.1 libraries. It implements the launcher connection and tracks the game through an independent Cabbage host process. Windows verifies the official bootstrap through Authenticode and tracks its descendants through a job object. Neither route is authenticated gameplay acceptance yet. See official-rs3.md.
 
-The user confirmed RS3 launching and the dedicated GPU preference on Linux. Client repair/uninstall controls are implemented as right-click actions on the bottom client row and documented in client-maintenance.md. Remaining work includes Windows live acceptance for all adapters, broader failure recovery checks, and packaging. Automatic Wine installation remains deferred by user preference.
+The user confirmed RS3 launching and the dedicated GPU preference on Linux. Client repair/uninstall controls are implemented as right-click actions on the bottom client row and documented in client-maintenance.md. Remaining work includes Windows live acceptance for all adapters and signed launcher update installation. Automatic Wine installation remains deferred by user preference.
 
 ## Recovery and launcher-update audit
 
-Recovery cases and fixes are recorded in recovery-testing.md. Launcher release checks use only birdturtle/Cabbage; self-update installation and packaging are still outstanding. The launcher-updates.md plan includes a separate versioned RS3 game host before packaging, signed NSIS/AppImage artifacts, channel selection, explicit installation modes and installed-upgrade recovery tests.
+Recovery cases and fixes are recorded in recovery-testing.md. Launcher release checks use only birdturtle/Cabbage. The separate game host, Linux AppImage and Windows EXE packaging, and portable/per-user installation are implemented. Signed update installation and installed-upgrade recovery remain in launcher-updates.md.

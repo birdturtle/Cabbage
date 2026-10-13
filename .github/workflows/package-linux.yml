@@ -1,8 +1,7 @@
 name: Linux package
 on:
   workflow_dispatch:
-  push:
-    branches: [feature/multi-client-launcher]
+  workflow_call:
 permissions:
   contents: read
 jobs:

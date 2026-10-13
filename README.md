@@ -2,46 +2,67 @@
 
 An unofficial Windows and Linux launcher for RuneScape and Old School RuneScape.
 
-The launcher source and history were extracted from HapticScape. Cabbage has its own application identity, settings, encrypted account vault, cache, and desktop entry.
+## Features
+
+- Jagex sign-in with saved accounts and character selection.
+- RuneLite, official Old School RuneScape, and RuneScape clients.
+- Automatic client downloads.
+- Repair and uninstall from each client's right-click menu.
+- Portable use or installation with application-menu shortcuts.
+- System tray support.
+- Keep the launcher open, hide it to the tray, or close it after Play.
+- Dedicated GPU preference on Linux.
+- Release checks with optional beta updates.
+
+## Installation
+
+Download the build for your system from [Releases](https://github.com/birdturtle/Cabbage/releases).
+
+### Windows
+
+Open `Cabbage-Windows-x64-0.1.0-rc.1.exe` and choose **Install Cabbage** or **Keep portable**. Installation adds Cabbage to the Start Menu and Installed Apps without administrator access.
+
+[Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) is required. Install it first if it is missing.
+
+### Linux
+
+Make the AppImage executable and open it:
+
+```sh
+chmod +x Cabbage-Linux-x64-0.1.0-rc.1.AppImage
+./Cabbage-Linux-x64-0.1.0-rc.1.AppImage
+```
+
+Choose **Install Cabbage** to add it to your application menu, or **Keep portable**. Installation does not require sudo.
+
+A desktop keyring providing Secret Service is required for saved accounts. The official Old School client requires Wine. RuneLite and RuneScape run natively.
+
+### Uninstall
+
+Use **Settings > Installation > Uninstall Cabbage**. Windows installations can also be removed through Installed Apps. Saved accounts, preferences, games and caches are kept.
+
+## Updates
+
+The Updates page checks Cabbage releases. Enable **Include beta updates** to see release candidates.
+
+Launcher update installation is not included in this RC. Download new builds from Releases and choose Install Cabbage. Close an older launcher before installing its replacement.
 
 ## Development
-
-The source extraction and removal of inherited application controls are complete. Jagex sign-in, saved accounts, character selection, preferences, and tray behavior remain. Play downloads the official RuneLite launcher and a Temurin Java 21 runtime, verifies their SHA256 checksums, renews the selected Jagex session, and launches the selected character. RuneLite handles its game-client updates. Windows and Linux are supported by the shared launch path.
 
 ```sh
 npm ci
 npm run check
+cargo test --manifest-path game-host/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run dev
 ```
 
-Tauri development requires Node.js and Rust. Linux builds need WebKitGTK 4.1, GTK 3, and Secret Service. Windows builds use the Microsoft C++ build tools and WebView2.
+Build the Linux AppImage with `npm run build -- --bundles appimage`. Build the Windows EXE with `npm run build -- --no-bundle` on Windows.
 
-Saved accounts use AES-GCM encryption with a key held in Windows Credential Manager or Linux Secret Service.
-
-Cabbage uses `com.birdturtle.cabbage` for application storage and `com.birdturtle.cabbage.jagex.v1` for its account-vault key. HapticScape accounts and settings are not imported.
-
-## Game and client selection
-
-Choose Old School RuneScape or RuneScape, then a client. RuneLite and Official OSRS are available. Official OSRS uses Wine on Linux. The RS3 adapter is ready for testing with a native Linux client and the signed Windows launcher. Cabbage remembers the selected game and Old School client.
-
-Launches are tracked per account and character. Different characters can have separate game sessions; launching the same character twice is blocked. Windows live acceptance and RS3 gameplay testing remain outstanding.
-
-## Launcher updates
-
-The Updates page checks Cabbage releases. Installing launcher updates is still under development.
-
-## Client files
-
-Right-click OSRS, RuneLite or RS3 at the bottom of Home to repair or uninstall it. Repair replaces managed client files. Uninstall keeps saved accounts, game settings and caches. Close the client before using either action.
-
-## Planned clients
-
-- Old School RuneScape: RuneLite and the official client.
-- RuneScape: the official client.
+Tauri development requires Node.js and Rust. Linux builds need WebKitGTK 4.1, GTK 3 and Secret Service. Windows builds need the Microsoft C++ build tools and WebView2.
 
 ## License
 
-BSD 2-Clause. See LICENSE and THIRD-PARTY-NOTICES.md.
+BSD 2-Clause. See LICENSE and THIRD-PARTY-NOTICES.md. Based on HapticScape's launcher.
 
 Unofficial software. Not affiliated with Jagex or RuneLite.
