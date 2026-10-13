@@ -18,7 +18,7 @@ cat > "$launcher_applications/com.birdturtle.cabbage.desktop" <<EOF
 Type=Application
 Name=Cabbage
 Exec="$launcher_exec"
-Icon=$launcher_root/src-tauri/icons/icon.png
+Icon=$launcher_icons/com.birdturtle.cabbage.png
 StartupWMClass=com.birdturtle.cabbage
 Terminal=false
 Categories=Game;Utility;
