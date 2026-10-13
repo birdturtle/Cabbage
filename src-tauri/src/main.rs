@@ -391,10 +391,18 @@ async fn begin_login(window: WebviewWindow, app: tauri::AppHandle) -> Result<(),
         account.message = "Complete sign-in in the Jagex window.".into();
     }
     let handle = app.clone();
-    let builder = WebviewWindowBuilder::new(&app, "jagex-auth", WebviewUrl::External(url))
+    let browser_profile = app.path().app_data_dir()
+        .map_err(|_| "Cannot locate the sign-in browser profile.".to_string())?
+        .join("jagex-browser");
+    fs::create_dir_all(&browser_profile)
+        .map_err(|_| "Cannot create the sign-in browser profile.".to_string())?;
+    let builder = WebviewWindowBuilder::new(&app, "jagex-auth", WebviewUrl::External(url::Url::parse("about:blank").unwrap()))
         .title("Sign in to Jagex • Cabbage")
         .inner_size(540.0, 760.0)
-        .incognito(true)
+        // Keep challenge cookies and browser storage across login redirects and retries.
+        // This profile is local to Cabbage and has no launcher capabilities.
+        .data_directory(browser_profile)
+        .devtools(false)
         .on_navigation(move |url| {
             // No remote window gets launcher IPC. Intercept callbacks before a network request.
             match auth::callback(url) {
@@ -435,6 +443,17 @@ async fn begin_login(window: WebviewWindow, app: tauri::AppHandle) -> Result<(),
         });
     match builder.build() {
         Ok(auth_window) => {
+            #[cfg(target_os = "linux")]
+            auth_window.with_webview(|webview| {
+                use webkit2gtk::WebViewExt;
+                webview.inner().connect_load_failed(|_, _, failed_uri, error| {
+                    let host = url::Url::parse(failed_uri).ok().and_then(|u| u.host_str().map(str::to_owned)).unwrap_or_default();
+                    // Never log redirect paths, codes, tokens, or page content.
+                    eprintln!("Jagex browser load failed: host={} domain={:?} network_error={:?}", host, error.domain(), error.kind::<webkit2gtk::NetworkError>());
+                    false
+                });
+            }).map_err(|_| "Cannot initialize the sign-in browser.".to_string())?;
+            auth_window.navigate(url).map_err(|_| "Cannot open Jagex sign-in.".to_string())?;
             let app = app.clone();
             auth_window.on_window_event(move |event| {
                 if matches!(event, tauri::WindowEvent::Destroyed) {

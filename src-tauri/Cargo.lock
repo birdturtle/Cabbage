@@ -424,6 +424,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tokio",
  "url",
+ "webkit2gtk",
  "zeroize",
  "zip",
 ]

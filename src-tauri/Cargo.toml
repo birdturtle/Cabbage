@@ -27,6 +27,7 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
+webkit2gtk = "2.0"
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
