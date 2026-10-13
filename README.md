@@ -52,11 +52,11 @@ Right-click a client card to **Repair** or **Uninstall** that client.
 ## Settings
 
 - Keep Cabbage open, hide it to the system tray, or close it after Play.
-- Prefer your dedicated GPU on Linux systems with more than one GPU.
+- Prefer your dedicated GPU; useful for those with integrated graphics and discrete graphics.
 - Check for launcher updates on startup.
 - Include beta updates if you want to try prereleases.
 
-Closing the window hides Cabbage to the tray when the tray is available. Use the tray menu to restore the window or exit. Exiting Cabbage leaves running games open.
+Closing the window hides Cabbage to the tray. Use the tray menu to restore the window or exit. Exiting Cabbage leaves running games open.
 
 ## Updates
 
