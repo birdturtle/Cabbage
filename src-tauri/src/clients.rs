@@ -66,6 +66,7 @@ impl ClientId {
         root: &Path,
         progress: &Mutex<Progress>,
     ) -> Result<PreparedClient, String> {
+        crate::maintenance::recover(&root.join(self.directory()), self)?;
         if let Some(reason) = self.unavailable_reason(std::env::consts::OS, std::env::consts::ARCH)
         {
             return Err(reason.into());
@@ -231,6 +232,42 @@ impl Manager {
     pub fn is_running(&self, key: &LaunchKey) -> bool {
         self.running.contains_key(key)
     }
+    pub fn client_in_use(&self, client: ClientId) -> bool {
+        self.running
+            .values()
+            .any(|running| running.client == client)
+    }
+    pub fn begin_maintenance(&mut self, client: ClientId) -> Result<Arc<Mutex<Progress>>, String> {
+        self.reap();
+        if self.client_in_use(client) {
+            return Err("Close this client before repairing or uninstalling it.".into());
+        }
+        let progress = self.progress(client);
+        {
+            let mut state = progress.lock().unwrap();
+            if state.busy {
+                return Err("This client is busy. Try again when it is ready.".into());
+            }
+            state.busy = true;
+            state.message = "Preparing client maintenance...".into();
+        }
+        Ok(progress)
+    }
+    pub fn finish_maintenance(
+        &mut self,
+        client: ClientId,
+        result: &Result<(), String>,
+        success: &str,
+    ) {
+        let progress = self.progress(client);
+        let mut state = progress.lock().unwrap();
+        state.busy = false;
+        state.message = result
+            .as_ref()
+            .err()
+            .cloned()
+            .unwrap_or_else(|| success.into());
+    }
     pub fn running_message(&self, key: &LaunchKey) -> Option<String> {
         self.running
             .get(key)
@@ -330,6 +367,37 @@ mod tests {
             &Err("Download failed".into()),
         );
         manager.begin(ClientId::Runelite, &key("a")).unwrap();
+    }
+    #[test]
+    fn maintenance_blocks_launches_and_releases_reservation_after_failure() {
+        let mut manager = Manager::default();
+        manager.begin_maintenance(ClientId::Runelite).unwrap();
+        assert!(manager.begin(ClientId::Runelite, &key("a")).is_err());
+        assert!(manager.begin_maintenance(ClientId::Runelite).is_err());
+        manager.finish_maintenance(
+            ClientId::Runelite,
+            &Err("download failed".into()),
+            "repaired",
+        );
+        manager.begin(ClientId::Runelite, &key("a")).unwrap();
+        assert!(manager.begin_maintenance(ClientId::Runelite).is_err());
+        manager.finish(ClientId::Runelite, &key("a"), &Ok(()));
+        let mut child = sleeping_child();
+        manager.started(
+            ClientId::Runelite,
+            key("other-character"),
+            "Other".into(),
+            child,
+        );
+        assert!(manager.begin_maintenance(ClientId::Runelite).is_err());
+        child = manager
+            .running
+            .remove(&key("other-character"))
+            .unwrap()
+            .child;
+        let _ = child.kill();
+        let _ = child.wait();
+        manager.begin_maintenance(ClientId::Runelite).unwrap();
     }
     #[test]
     fn different_characters_can_run_without_replacing_each_other() {

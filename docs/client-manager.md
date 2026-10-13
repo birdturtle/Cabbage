@@ -13,3 +13,5 @@ RuneLite is the first adapter. Its existing `clients/runelite` directory and ins
 The frontend offers game/client selectors, selected-client status, and availability feedback. Different characters can launch after the prior preparation finishes. Test actual concurrent gameplay on both platforms before release.
 
 Validation covers old-settings migration, game/client compatibility, saved choices, unavailable adapters, duplicate reservations, retry after failure, independent process tracking, captured account lookup, and frontend selection/launch behavior. Live RuneLite acceptance and Windows CI are separate checks.
+
+Client maintenance is implemented in Settings. Reservations cover all tracked characters for the selected client, and an independent process check protects games left running after launcher exit. See client-maintenance.md for managed paths and interrupted-replacement recovery.

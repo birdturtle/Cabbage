@@ -4,6 +4,7 @@ mod auth;
 mod clients;
 mod downloads;
 mod graphics;
+mod maintenance;
 mod osrs;
 mod rs3;
 mod runelite;
@@ -43,6 +44,8 @@ struct Status {
     client_available: bool,
     client_running: bool,
     client_busy: bool,
+    client_in_use: bool,
+    client_files_present: bool,
     client_message: String,
     client_version: Option<String>,
     installed_version: String,
@@ -103,6 +106,11 @@ async fn launcher_status(
             .is_none(),
         client_running: running,
         client_busy: client.busy,
+        client_in_use: manager.client_in_use(selected),
+        client_files_present: maintenance::has_files(
+            &client_root(&app)?.join(selected.directory()),
+            selected,
+        ),
         client_message: running_message.unwrap_or_else(|| {
             selected
                 .unavailable_reason(std::env::consts::OS, std::env::consts::ARCH)
@@ -243,6 +251,41 @@ fn select_client(
     persist_settings(&app, &updated)?;
     *settings = updated;
     Ok(())
+}
+
+#[tauri::command]
+async fn maintain_client(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    client: clients::ClientId,
+    operation: maintenance::Operation,
+) -> Result<String, String> {
+    local(&window)?;
+    let progress = app
+        .state::<AppState>()
+        .clients
+        .lock()
+        .unwrap()
+        .begin_maintenance(client)?;
+    let handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let root = client_root(&handle)?;
+        tauri::async_runtime::block_on(maintenance::run(&root, client, operation, &progress))
+    })
+    .await
+    .map_err(|_| "Client maintenance failed.".to_string())
+    .and_then(|result| result);
+    let success = match operation {
+        maintenance::Operation::Repair => "Client repaired.",
+        maintenance::Operation::Uninstall => "Client uninstalled.",
+    };
+    app.state::<AppState>()
+        .clients
+        .lock()
+        .unwrap()
+        .finish_maintenance(client, &result, success);
+    result?;
+    Ok(success.into())
 }
 
 #[tauri::command]
@@ -755,6 +798,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             launcher_status,
             launch_client,
+            maintain_client,
             select_client,
             save_preferences,
             begin_login,

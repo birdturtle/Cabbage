@@ -11,7 +11,7 @@ function launcher(preferences, options = {}) {
     if (!elements.has(id)) elements.set(id, {
       dataset: {}, checked: false, children: [], listeners: {},
       querySelectorAll: () => [],
-      setAttribute() {},
+      setAttribute() {}, showModal(){this.open=true;}, close(){this.open=false;},
       classList: { toggle() {} },
       elements: { namedItem: (name) => element(`${id}:${name}`) },
       addEventListener(type, callback) { this.listeners[type] = callback; },
@@ -180,4 +180,33 @@ test('dedicated GPU preference loads, survives polling, and saves on Linux', asy
   const windows = launcher({preferDedicatedGpu:false,checkUpdatesOnStartup:false}, {status:{platform:'windows'}});
   await settle();
   assert.equal(windows.element('dedicated-gpu-preference').hidden, true);
+});
+
+test('repair captures the selected client and running clients block maintenance', async () => {
+  const app = launcher({checkUpdatesOnStartup:false}, {status:{clientFilesPresent:true,clientInUse:false,clientBusy:false}});
+  await settle();
+  await app.element('repair-client').listeners.click();
+  assert.equal(app.calls.find(call => call.command === 'maintain_client').args.client, 'runelite');
+  app.status.clientInUse=true; await app.poll();
+  assert.equal(app.element('repair-client').disabled, true);
+  assert.equal(app.element('uninstall-client').disabled, true);
+  await app.element('repair-client').listeners.click();
+  await app.element('uninstall-client').listeners.click();
+  assert.equal(app.calls.filter(call => call.command === 'maintain_client').length,1);
+});
+
+test('uninstall needs confirmation and preserves the originally selected client', async () => {
+  const app = launcher({checkUpdatesOnStartup:false}, {status:{clientFilesPresent:true,clientInUse:false,clientBusy:false}});
+  await settle();
+  app.element('uninstall-client').listeners.click();
+  assert.equal(app.element('uninstall-dialog').open,true);
+  assert.ok(!app.calls.some(call => call.command === 'maintain_client'));
+  app.element('cancel-uninstall').listeners.click();
+  await app.element('confirm-uninstall').listeners.click();
+  assert.ok(!app.calls.some(call => call.command === 'maintain_client'));
+  app.element('uninstall-client').listeners.click();
+  app.status.selectedClient='officialRs3';
+  await app.element('confirm-uninstall').listeners.click();
+  const call=app.calls.find(call => call.command === 'maintain_client');
+  assert.equal(call.args.client,'runelite'); assert.equal(call.args.operation,'uninstall');
 });

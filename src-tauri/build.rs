@@ -3,6 +3,7 @@ fn main() {
         .app_manifest(tauri_build::AppManifest::new().commands(&[
             "launcher_status",
             "launch_client",
+            "maintain_client",
             "select_client",
             "save_preferences",
             "begin_login",

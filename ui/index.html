@@ -58,11 +58,22 @@
           <label class="preference-row"><input type="checkbox" name="includeBetaUpdates"><span>Include beta updates</span></label>
           <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
         </form>
+        <section class="panel" aria-labelledby="client-files-heading">
+          <h2 id="client-files-heading">Client files</h2>
+          <p id="managed-client-name"></p>
+          <p id="client-maintenance-status" role="status"></p>
+          <div class="action-row"><button class="button" id="repair-client">Repair</button><button class="button remove-button" id="uninstall-client">Uninstall</button></div>
+        </section>
         <p class="help-text">Closing the window hides the launcher to the tray. Tray Exit closes Cabbage.</p>
       </section>
     </div>
     <footer><span>Cabbage</span><span class="image-disclaimer">RuneScape imagery © Jagex Ltd. Unofficial launcher; not affiliated with Jagex.</span></footer>
   </main>
+  <dialog id="uninstall-dialog" aria-labelledby="uninstall-title">
+    <h2 id="uninstall-title">Uninstall client?</h2>
+    <p>Remove this client's files? Saved accounts, game settings and caches are kept.</p>
+    <div class="action-row"><button class="button" id="cancel-uninstall">Cancel</button><button class="button primary" id="confirm-uninstall">Uninstall</button></div>
+  </dialog>
   <div class="toast" id="toast" role="status" hidden></div>
 </body>
 </html>

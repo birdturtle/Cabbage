@@ -4,6 +4,7 @@ let busy = false;
 let checkingUpdates = false;
 let updateFeedback = false;
 let toastTimer;
+let pendingUninstall;
 const $ = (id) => document.getElementById(id);
 
 function page(name) {
@@ -68,9 +69,14 @@ function render() {
   const clientName = choices.find(client => client.id === status.selectedClient)?.name || '';
   const character = status.characters.some(item => item.accountId === status.selectedCharacter);
   $('play').disabled = busy || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
-  $('play').textContent = status.clientBusy ? 'Starting…' : 'Play';
+  $('play').textContent = status.clientBusy ? 'Please wait…' : 'Play';
   $('play-hint').textContent = status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.');
   $('client-version').textContent = status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName;
+  $('managed-client-name').textContent = `${selectedGame === 'runescape' ? 'RuneScape' : 'Old School RuneScape'} · ${clientName}`;
+  $('client-maintenance-status').textContent = status.clientMessage || (status.clientFilesPresent ? status.clientVersion ? `Installed: ${status.clientVersion}` : 'Client files need repair.' : 'Not installed. Play installs this client.');
+  const maintenanceBlocked = busy || status.clientBusy || status.clientInUse || !status.clientFilesPresent;
+  $('repair-client').disabled = maintenanceBlocked || !status.clientAvailable;
+  $('uninstall-client').disabled = maintenanceBlocked;
   $('installed-version').textContent = status.installedVersion || '';
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : status.platform;
   $('sign-in').disabled = busy || status.signingIn;
@@ -141,6 +147,22 @@ $('game-select').addEventListener('change', event => {
   return action('select_client', { game, client });
 });
 $('client-select').addEventListener('change', event => action('select_client', { game: status.settings.selectedGame, client: event.target.value }));
+$('repair-client').addEventListener('click', () => {
+  if (!busy && status?.clientAvailable && status?.clientFilesPresent && !status.clientBusy && !status.clientInUse) return action('maintain_client', {client:status.selectedClient,operation:'repair'});
+});
+$('uninstall-client').addEventListener('click', () => {
+  if (busy || !status?.clientFilesPresent || status.clientBusy || status.clientInUse) return;
+  pendingUninstall = status.selectedClient;
+  $('uninstall-title').textContent = `Uninstall ${$('managed-client-name').textContent}?`;
+  $('uninstall-dialog').showModal();
+});
+$('cancel-uninstall').addEventListener('click', () => { pendingUninstall = undefined; $('uninstall-dialog').close(); });
+$('uninstall-dialog').addEventListener('cancel', () => { pendingUninstall = undefined; });
+$('confirm-uninstall').addEventListener('click', () => {
+  if (!pendingUninstall || busy) return;
+  const client = pendingUninstall; pendingUninstall = undefined; $('uninstall-dialog').close();
+  return action('maintain_client', {client,operation:'uninstall'});
+});
 $('accounts').addEventListener('change', (event) => action('select_account', { id: event.target.value }));
 $('remove-account').addEventListener('click', () => { if (status?.selectedAccount) action('remove_account', { id: status.selectedAccount }); });
 for (const [id, command] of [['sign-in', 'begin_login'], ['cancel-login', 'cancel_login']]) $(id).addEventListener('click', () => action(command));

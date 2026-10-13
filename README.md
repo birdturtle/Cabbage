@@ -27,6 +27,10 @@ Choose Old School RuneScape or RuneScape, then a client. RuneLite and Official O
 
 Launches are tracked per account and character. Different characters can have separate game sessions; launching the same character twice is blocked. Windows live acceptance and RS3 gameplay testing remain outstanding.
 
+## Client files
+
+Select a client on Home, then open Settings to repair or uninstall it. Repair replaces managed client files. Uninstall keeps saved accounts, game settings and caches. Close the client before using either action.
+
 ## Planned clients
 
 - Old School RuneScape: RuneLite and the official client.
