@@ -36,56 +36,55 @@ pub fn version(tag: &str) -> Result<semver::Version, String> {
 fn select_release(releases: Vec<GitHubRelease>, beta: bool) -> Result<GitHubRelease, String> {
     releases
         .into_iter()
-        .filter(|r| !r.draft && (beta || !r.prerelease))
-        .filter_map(|r| version(&r.tag_name).ok().map(|v| (v, r)))
+        .filter_map(|r| {
+            let v = version(&r.tag_name).ok()?;
+            if r.draft || (!beta && (r.prerelease || !v.pre.is_empty())) {
+                return None;
+            }
+            Some((v, r))
+        })
         .max_by(|a, b| a.0.cmp(&b.0))
         .map(|(_, r)| r)
         .ok_or_else(|| "No published releases are available for this update channel.".into())
 }
+fn feed_url(page: usize) -> String {
+    format!("https://api.github.com/repos/{REPOSITORY}/releases?per_page=100&page={page}")
+}
 pub async fn latest(http: &reqwest::Client, beta: bool) -> Result<GitHubRelease, String> {
-    if beta {
-        let mut releases = Vec::new();
-        for page in 1..=10 {
-            let batch: Vec<GitHubRelease> = http
-                .get(format!(
-                    "https://api.github.com/repos/{REPOSITORY}/releases?per_page=100&page={page}"
-                ))
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "Cabbage")
-                .send()
-                .await
-                .map_err(|_| "Cannot reach GitHub. Try again later.".to_string())?
-                .error_for_status()
-                .map_err(|_| "GitHub could not return releases.".to_string())?
-                .json()
-                .await
-                .map_err(|_| "GitHub returned invalid release information.".to_string())?;
-            let done = batch.len() < 100;
-            releases.extend(batch);
-            if done {
-                return select_release(releases, true);
-            }
+    let mut releases = Vec::new();
+    for page in 1..=10 {
+        let response = http
+            .get(feed_url(page))
+            .timeout(std::time::Duration::from_secs(20))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Cabbage")
+            .send()
+            .await
+            .map_err(|_| "Cannot reach GitHub. Try again later.".to_string())?
+            .error_for_status()
+            .map_err(|_| "GitHub could not return Cabbage releases.".to_string())?;
+        let batch = parse_feed(&crate::downloads::read_limited(response, 1024 * 1024).await?)?;
+        let done = batch.len() < 100;
+        releases.extend(batch);
+        if done {
+            return select_release(releases, beta);
         }
-        return Err("Too many releases to check safely.".into());
     }
-    http.get(format!(
-        "https://api.github.com/repos/{REPOSITORY}/releases/latest"
-    ))
-    .header("Accept", "application/vnd.github+json")
-    .header("User-Agent", "Cabbage")
-    .send()
-    .await
-    .map_err(|_| "Cannot reach GitHub. Try again later.".to_string())?
-    .error_for_status()
-    .map_err(|_| {
-        "No published Cabbage release is available, or GitHub could not return it.".to_string()
-    })?
-    .json()
-    .await
-    .map_err(|_| "GitHub returned invalid release information.".into())
+    Err("Too many releases to check safely.".into())
+}
+fn parse_feed(bytes: &[u8]) -> Result<Vec<GitHubRelease>, String> {
+    let batch: Vec<GitHubRelease> = serde_json::from_slice(bytes)
+        .map_err(|_| "GitHub returned invalid release information.")?;
+    if batch.len() > 100 {
+        return Err("GitHub returned an oversized release listing.".into());
+    }
+    Ok(batch)
 }
 
 pub fn describe(release: GitHubRelease, installed: &str) -> Result<Release, String> {
+    if release.draft {
+        return Err("Draft releases cannot be offered as updates.".into());
+    }
     let available = version(&release.tag_name)? > version(installed)?;
     Ok(Release {
         tag: release.tag_name,
@@ -142,6 +141,38 @@ mod tests {
             .tag_name,
             "v1.1.0-beta.1"
         );
+    }
+    #[test]
+    fn stable_channel_rejects_rc_tags_even_when_github_flag_is_wrong() {
+        let list = vec![
+            release("v1.0.0", false, false),
+            release("v2.0.0-rc.1", false, false),
+        ];
+        assert_eq!(select_release(list, false).unwrap().tag_name, "v1.0.0");
+    }
+    #[test]
+    fn repo_endpoint_is_cabbage_and_older_releases_never_offer_a_downgrade() {
+        assert_eq!(
+            feed_url(1),
+            "https://api.github.com/repos/birdturtle/Cabbage/releases?per_page=100&page=1"
+        );
+        assert!(
+            !describe(release("v1.0.0", false, false), "1.1.0")
+                .unwrap()
+                .available
+        );
+        assert!(
+            describe(release("v1.1.0", false, false), "1.1.0-rc.1")
+                .unwrap()
+                .available
+        );
+        assert!(
+            !describe(release("v1.1.0-rc.1", true, false), "1.1.0")
+                .unwrap()
+                .available
+        );
+        assert!(describe(release("v2.0.0", false, true), "1.0.0").is_err());
+        assert!(parse_feed(br#"{"message":"rate limited"}"#).is_err());
     }
     #[test]
     fn malformed_and_empty_feeds_fail_closed() {

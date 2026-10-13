@@ -284,6 +284,28 @@ fn failed_later_request_preserves_rotated_token_and_account_for_retry() {
     assert_eq!(disk.selected, original.selected);
     assert!(!disk.needs_sign_in);
     worker.join().unwrap();
+    let (origin, worker) = server(7, |request| {
+        if request.starts_with("POST /oauth2/token ") {
+            assert!(request.contains("refresh_token=rotated"));
+        }
+        provider_request(request, false)
+    });
+    let services = Services {
+        origin: &origin,
+        game: &format!("{origin}/game"),
+    };
+    run(ensure_session_at(
+        &http(),
+        &mut disk,
+        "account",
+        |_| Ok(()),
+        &services,
+    ))
+    .unwrap();
+    assert_eq!(disk.session_id, "renewed-session");
+    assert_eq!(disk.selected, original.selected);
+    assert!(!disk.needs_sign_in);
+    worker.join().unwrap();
 }
 #[test]
 fn invalid_grant_keeps_account_and_requests_sign_in_without_launching() {

@@ -592,6 +592,57 @@ mod tests {
         fs::remove_file(file).unwrap();
     }
     #[test]
+    fn interrupted_download_can_retry_in_fresh_staging_without_changing_active_record() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let worker = std::thread::spawn(move || {
+            for body in ["go", "good"] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 4096];
+                stream.read(&mut request).unwrap();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n{body}"
+                )
+                .unwrap();
+            }
+        });
+        let root = std::env::temp_dir().join(format!(
+            "cabbage download recovery {:x}",
+            rand::random::<u64>()
+        ));
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("current.json"), b"old-record").unwrap();
+        let digest = format!("{:x}", Sha256::digest(b"good"));
+        let state = Mutex::new(State::default());
+        let http = reqwest::Client::new();
+        let first = tauri::async_runtime::block_on(download(
+            &http,
+            &format!("http://{address}/package"),
+            &digest,
+            4,
+            &root.join("partial"),
+            &state,
+            "test",
+        ));
+        assert!(first.is_err());
+        assert_eq!(fs::read(root.join("current.json")).unwrap(), b"old-record");
+        tauri::async_runtime::block_on(download(
+            &http,
+            &format!("http://{address}/package"),
+            &digest,
+            4,
+            &root.join("retry"),
+            &state,
+            "test",
+        ))
+        .unwrap();
+        assert_eq!(fs::read(root.join("retry")).unwrap(), b"good");
+        worker.join().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn windows_java_archive_extracts_to_a_managed_executable() {
         let root = std::env::temp_dir().join(format!(
             "cabbage-windows-runtime-{:x}",

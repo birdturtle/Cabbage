@@ -82,3 +82,7 @@ The shared registry/manager and game/client selectors are implemented with RuneL
 The Linux adapter downloads binaryType=4 from the current Jagex configuration, checks the decompressed client against the published CRC, and installs private pinned OpenSSL 1.1 libraries. It implements the launcher connection and tracks the game through an independent Cabbage host process. Windows verifies the official bootstrap through Authenticode and tracks its descendants through a job object. Neither route is authenticated gameplay acceptance yet. See official-rs3.md.
 
 The user confirmed RS3 launching and the dedicated GPU preference on Linux. Client repair/uninstall controls are implemented as right-click actions on the bottom client row and documented in client-maintenance.md. Remaining work includes Windows live acceptance for all adapters, broader failure recovery checks, and packaging. Automatic Wine installation remains deferred by user preference.
+
+## Recovery and launcher-update audit
+
+Recovery cases and fixes are recorded in recovery-testing.md. Launcher release checks use only birdturtle/Cabbage; self-update installation and packaging are still outstanding. The launcher-updates.md plan includes a separate versioned RS3 game host before packaging, signed NSIS/AppImage artifacts, channel selection, explicit installation modes and installed-upgrade recovery tests.

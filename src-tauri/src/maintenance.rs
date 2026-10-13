@@ -325,7 +325,7 @@ mod tests {
     }
     fn root() -> PathBuf {
         let root =
-            std::env::temp_dir().join(format!("cabbage-maintenance-{:x}", rand::random::<u64>()));
+            std::env::temp_dir().join(format!("cabbage maintenance {:x}", rand::random::<u64>()));
         fs::create_dir(&root).unwrap();
         root
     }
@@ -408,6 +408,37 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
+    fn committed_replacement_is_kept_and_missing_journal_never_deletes_backups() {
+        let root = root();
+        let client = ClientId::OfficialRs3;
+        let folder = transaction(&root);
+        put(&root, "versions/new/file", b"new");
+        put(&root, "current.json", b"new-record");
+        put(&folder, "files/versions/old/file", b"old");
+        let journal = Journal {
+            client,
+            entries: paths(client)
+                .iter()
+                .map(|name| Entry {
+                    name: (*name).into(),
+                    existed: true,
+                })
+                .collect(),
+        };
+        downloads::activate_json(&folder, &journal).unwrap();
+        put(&folder, "committed", b"");
+        recover(&root, client).unwrap();
+        assert_eq!(fs::read(root.join("versions/new/file")).unwrap(), b"new");
+        assert!(!folder.exists());
+        put(&folder, "files/current.json", b"old-record");
+        assert!(recover(&root, client).is_err());
+        assert_eq!(
+            fs::read(folder.join("files/current.json")).unwrap(),
+            b"old-record"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn repaired_copy_is_activated_without_changing_settings() {
         let root = root();
         let fresh = root.join(".repair");
@@ -469,6 +500,42 @@ mod tests {
         activate(&root, None, ClientId::OfficialOsrs).unwrap();
         assert_eq!(fs::read(external.join("keep")).unwrap(), b"keep");
         fs::remove_dir_all(root).unwrap();
+    }
+    fn live_client_recovery(client_id: ClientId) {
+        let root = root();
+        let client = root.join(client_id.directory());
+        let progress = Mutex::new(Progress::default());
+        put(&client, "current.json", b"damaged install record");
+        put(&client, "data/settings", b"keep");
+        put(&client, "wine-prefix/user.reg", b"keep");
+        put(&root, "accounts.json", b"keep");
+        tauri::async_runtime::block_on(run(&root, client_id, Operation::Repair, &progress))
+            .unwrap();
+        assert!(client_id.installed_version(&root).is_some());
+        tauri::async_runtime::block_on(run(&root, client_id, Operation::Uninstall, &progress))
+            .unwrap();
+        assert!(!has_files(&client, client_id));
+        tauri::async_runtime::block_on(run(&root, client_id, Operation::Repair, &progress))
+            .unwrap();
+        assert!(client_id.installed_version(&root).is_some());
+        for path in [
+            client.join("data/settings"),
+            client.join("wine-prefix/user.reg"),
+            root.join("accounts.json"),
+        ] {
+            assert_eq!(fs::read(path).unwrap(), b"keep");
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    #[ignore = "downloads RuneLite and Java twice into isolated recovery folders"]
+    fn live_recovery_runelite_repair_uninstall_reinstall() {
+        live_client_recovery(ClientId::Runelite);
+    }
+    #[test]
+    #[ignore = "downloads official OSRS twice into isolated recovery folders"]
+    fn live_recovery_osrs_repair_uninstall_reinstall() {
+        live_client_recovery(ClientId::OfficialOsrs);
     }
     #[test]
     #[ignore = "downloads RS3 twice to verify repair/uninstall/reinstall without touching user installations"]
