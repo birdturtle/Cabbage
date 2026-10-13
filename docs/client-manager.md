@@ -4,7 +4,7 @@ Game IDs: `oldschool`, `runescape`. Client IDs: `runelite`, `officialOsrs`, `off
 
 Settings retain existing preferences and default older settings to Old School/RuneLite. Old School's client choice survives switching to RuneScape. The settings API rejects a client belonging to another game.
 
-The registry supplies availability and reasons to the UI and backend. Official OSRS is available on Windows x64 and Linux x64 with Wine installed. Official RS3 remains unavailable. A disabled Play button is backed by a manager availability check; invoking the command directly cannot prepare an unavailable client.
+The registry supplies availability and reasons to the UI and backend. Official OSRS is available on Windows x64 and Linux x64 with Wine installed. Official RS3 is implemented for Windows x64 and Linux x64, pending live acceptance. A disabled Play button is backed by a manager availability check; invoking the command directly cannot prepare an unavailable client.
 
 The manager owns installation progress and tracks each process by captured account and character. It serializes preparation per client, blocks duplicate running/queued characters, releases reservations after failure, and reaps exited processes. Closing the launcher does not kill games. Adoption after launcher restart remains out of scope.
 

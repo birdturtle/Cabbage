@@ -23,9 +23,9 @@ Cabbage uses `com.birdturtle.cabbage` for application storage and `com.birdturtl
 
 ## Game and client selection
 
-Choose Old School RuneScape or RuneScape, then a client. RuneLite is currently playable. Official client options remain unavailable while their integrations are being built. Cabbage remembers the selected game and Old School client.
+Choose Old School RuneScape or RuneScape, then a client. RuneLite and Official OSRS are available. Official OSRS uses Wine on Linux. The RS3 adapter is ready for testing with a native Linux client and the signed Windows launcher. Cabbage remembers the selected game and Old School client.
 
-Launches are tracked per account and character. Different characters can have separate RuneLite sessions; launching the same character twice is blocked. Live acceptance through the new manager is still required.
+Launches are tracked per account and character. Different characters can have separate game sessions; launching the same character twice is blocked. Windows live acceptance and RS3 gameplay testing remain outstanding.
 
 ## Planned clients
 

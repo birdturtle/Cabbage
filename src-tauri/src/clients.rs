@@ -1,4 +1,4 @@
-use crate::{osrs, runelite};
+use crate::{osrs, rs3, runelite};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -55,7 +55,10 @@ impl ClientId {
                 Some("Install Wine to use the official Old School client on Linux.")
             }
             Self::OfficialOsrs => None,
-            Self::OfficialRs3 => Some("Official RuneScape client support is not available yet."),
+            Self::OfficialRs3 if arch != "x86_64" => {
+                Some("The RuneScape client currently supports x86_64 only.")
+            }
+            Self::OfficialRs3 => None,
         }
     }
     pub async fn prepare(
@@ -79,18 +82,26 @@ impl ClientId {
                 osrs::prepare_wine(&root, progress)?;
                 Ok(PreparedClient::OfficialOsrs { root, install })
             }
-            _ => Err("This client adapter is not available.".into()),
+            Self::OfficialRs3 => {
+                let root = root.join(self.directory());
+                let prepared = rs3::ensure(&root, progress).await?;
+                Ok(PreparedClient::OfficialRs3 { root, prepared })
+            }
         }
     }
     pub fn installed_version(self, root: &Path) -> Option<String> {
         match self {
             Self::Runelite => runelite::installed(&root.join(self.directory())).map(|i| i.version),
             Self::OfficialOsrs => osrs::installed(&root.join(self.directory())).map(|i| i.version),
-            _ => None,
+            Self::OfficialRs3 => rs3::installed(&root.join(self.directory())).map(|i| i.version),
         }
     }
 }
 pub enum PreparedClient {
+    OfficialRs3 {
+        root: PathBuf,
+        prepared: rs3::Prepared,
+    },
     OfficialOsrs {
         root: PathBuf,
         install: osrs::Installed,
@@ -105,6 +116,7 @@ impl PreparedClient {
         match self {
             Self::RuneLite { root, install } => runelite::spawn(&root, &install, credentials),
             Self::OfficialOsrs { root, install } => osrs::spawn(&root, &install, credentials),
+            Self::OfficialRs3 { root, prepared } => rs3::spawn(&root, prepared, credentials),
         }
     }
 }
@@ -287,10 +299,15 @@ mod tests {
     }
     #[test]
     fn unavailable_adapters_cannot_prepare_or_launch() {
-        let mut manager = Manager::default();
-
-        assert!(manager.begin(ClientId::OfficialRs3, &key("a")).is_err());
-        assert!(manager.preparing.is_empty());
+        assert!(ClientId::OfficialRs3
+            .unavailable_reason("linux", "aarch64")
+            .is_some());
+        assert!(ClientId::OfficialRs3
+            .unavailable_reason("macos", "x86_64")
+            .is_some());
+        assert!(ClientId::OfficialRs3
+            .unavailable_reason("linux", "x86_64")
+            .is_none());
     }
     #[test]
     fn duplicate_reservations_are_blocked_and_failures_release_them() {

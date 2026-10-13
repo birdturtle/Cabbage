@@ -71,8 +71,14 @@ Jagex's [launcher and client download links](https://support.runescape.com/hc/en
 
 ## Research progress
 
-See [official-client-contracts.md](official-client-contracts.md) for the inspected Jagex Linux beta, verified OSRS content reconstruction, and RS3 bootstrap/dependency findings. Static research is complete for these artifacts; isolated runtime probes and authenticated Windows/Linux acceptance remain outstanding. The next implementation step is the shared manager with RuneLite regression coverage.
+See [official-client-contracts.md](official-client-contracts.md) for the inspected Jagex Linux beta, verified OSRS content reconstruction, and RS3 bootstrap/dependency findings. Static research is complete for these artifacts; isolated runtime probes and authenticated Windows/Linux acceptance remain outstanding. The shared manager and OSRS adapter are implemented; RS3 contracts are documented in official-rs3.md.
 
 ## Shared manager milestone
 
-The shared registry/manager and game/client selectors are implemented with RuneLite as the active adapter. Official clients remain unavailable. See client-manager.md. Existing RuneLite paths and account/browser state are preserved. Regression tests pass locally; live launch through the manager is the next acceptance check.
+The shared registry/manager and game/client selectors are implemented with RuneLite as the active adapter. Official OSRS is implemented and the user confirmed Linux launching. Official RS3 is implemented for testing. See client-manager.md. Existing RuneLite paths and account/browser state are preserved. Regression tests pass locally; live launch through the manager is the next acceptance check.
+
+## RS3 adapter milestone
+
+The Linux adapter downloads binaryType=4 from the current Jagex configuration, checks the decompressed client against the published CRC, and installs private pinned OpenSSL 1.1 libraries. It implements the launcher connection and tracks the game through an independent Cabbage host process. Windows verifies the official bootstrap through Authenticode and tracks its descendants through a job object. Neither route is authenticated gameplay acceptance yet. See official-rs3.md.
+
+Remaining work includes RS3 live gameplay, Windows acceptance for all adapters, client repair/uninstall controls, broader failure recovery checks, and packaging. Automatic Wine installation remains deferred by user preference.

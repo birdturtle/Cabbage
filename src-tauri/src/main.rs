@@ -4,6 +4,7 @@ mod auth;
 mod clients;
 mod downloads;
 mod osrs;
+mod rs3;
 mod runelite;
 mod settings;
 mod storage;
@@ -670,6 +671,25 @@ async fn check_updates(
 }
 
 fn main() {
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--rs3-host")) {
+        let args: Vec<_> = std::env::args_os().collect();
+        let result = if args.len() == 4 {
+            rs3::host(
+                std::path::Path::new(&args[2]),
+                std::path::Path::new(&args[3]),
+            )
+        } else {
+            Err("Invalid RuneScape host invocation.".into())
+        };
+        match result {
+            Ok(code) => std::process::exit(code),
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
+    }
+
     // GTK's Wayland window ID derives from the program name, even when the
     // GtkApplication has its own ID. Match the installed desktop entry.
     #[cfg(target_os = "linux")]
