@@ -39,6 +39,7 @@ function launcher(preferences, options = {}) {
         return options.release || { tag: 'v1', name: 'Release', notes: 'Notes' };
       }
       if (command === 'select_client') {
+        if(options.selectionGate) await options.selectionGate;
         status.settings.selectedGame = args.game;
         if (args.game === 'oldschool') status.settings.osrsClient = args.client;
         status.selectedClient = args.client;
@@ -143,20 +144,19 @@ test('download progress and failed launch stay visible while polling', async () 
 test('game and client selection persist choices and support both games', async () => {
   const app = launcher({ checkUpdatesOnStartup: false }, {status: {characters: [{accountId:'character',displayName:'Player'}], selectedCharacter:'character'}});
   await settle();
-  await app.element('client-select').listeners.change({ target: {value:'officialOsrs'} });
+  await app.element('client-officialOsrs').listeners.click();
   assert.equal(app.status.settings.osrsClient, 'officialOsrs');
   assert.equal(Boolean(app.element('play').disabled), false);
   await app.element('play').listeners.click();
   assert.equal(app.calls.filter(call => call.command === 'launch_client').length, 1);
-  await app.element('game-select').listeners.change({target:{value:'runescape'}});
+  await app.element('client-officialRs3').listeners.click();
   assert.equal(Boolean(app.element('play').disabled), false);
   await app.element('play').listeners.click();
   assert.equal(app.calls.filter(call => call.command === 'launch_client').length, 2);
   assert.equal(app.element('launch-title').textContent, 'RuneScape');
-  assert.equal(app.element('client-select').children.length, 1);
-  await app.element('game-select').listeners.change({target:{value:'oldschool'}});
+  await app.element('client-officialOsrs').listeners.click();
   assert.equal(app.status.selectedClient, 'officialOsrs');
-  await app.element('client-select').listeners.change({target:{value:'runelite'}});
+  await app.element('client-runelite').listeners.click();
   assert.equal(Boolean(app.element('play').disabled), false);
 });
 
@@ -166,7 +166,7 @@ test('game and client selection persist choices and support both games', async (
     characters:[{accountId:'character',displayName:'Player'}], selectedCharacter:'character'
   }});
   await settle();
-  await app.element('client-select').listeners.change({target:{value:'officialOsrs'}});
+  await app.element('client-officialOsrs').listeners.click();
   assert.equal(app.element('play').disabled, true);
   await app.element('play').listeners.click();
   assert.ok(!app.calls.some(call => call.command === 'launch_client'));
@@ -231,4 +231,18 @@ test('bottom client entries select clients and right-click targets the clicked e
   await app.element('client-officialRs3').listeners.click();
   assert.equal(app.status.selectedClient,'officialRs3');
   assert.equal(app.element('status-officialRs3').textContent,'Installed');
+});
+
+test('client switching stays responsive and rapid clicks save the last choice', async () => {
+  let release; const gate = new Promise(resolve => {release=resolve;});
+  const app = launcher({checkUpdatesOnStartup:false}, {selectionGate:gate}); await settle();
+  const first = app.element('client-officialRs3').listeners.click();
+  assert.equal(app.element('launch-title').textContent,'RuneScape');
+  assert.equal(Boolean(app.element('sign-in').disabled),false);
+  assert.equal(app.element('client-runelite').disabled,false);
+  const last = app.element('client-officialOsrs').listeners.click();
+  assert.equal(app.element('launch-title').textContent,'Old School RuneScape');
+  release(); await Promise.all([first,last]);
+  assert.equal(app.status.selectedClient,'officialOsrs');
+  assert.equal(app.calls.filter(call=>call.command==='select_client').at(-1).args.client,'officialOsrs');
 });

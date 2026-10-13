@@ -6,8 +6,12 @@ let updateFeedback = false;
 let toastTimer;
 let pendingUninstall;
 let menuClient;
+let selectingClient = false;
+let selectionRevision = 0;
+let selectionQueue = Promise.resolve();
 const clientLabels = {officialOsrs:"OSRS",runelite:"RuneLite",officialRs3:"RS3"};
 const $ = (id) => document.getElementById(id);
+function setText(id, text) { const node = $(id); if (node.textContent !== text) node.textContent = text; }
 
 function page(name) {
   if (!['home', 'updates', 'settings'].includes(name)) return;
@@ -49,52 +53,39 @@ async function action(command, args = {}) {
 
 function render() {
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
-  $('play').disabled = true;
-  $('play').textContent = busy ? 'Starting…' : 'Play';
-  $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
-  if (!status) return;
+
+  setText('check-updates', checkingUpdates ? 'Checking…' : 'Check for updates');
+  if (!status) { $('play').disabled = true; return; }
   const selectedGame = status.settings.selectedGame;
   const choices = status.clients.filter(client => client.game === selectedGame);
-  $('game-select').value = selectedGame;
-  const clientSignature = JSON.stringify([choices, status.selectedClient]);
-  if ($('client-select').dataset.signature !== clientSignature) {
-    $('client-select').replaceChildren();
-    for (const client of choices) {
-      const option = document.createElement('option'); option.value = client.id; option.textContent = client.name; $('client-select').append(option);
-    }
-    $('client-select').value = status.selectedClient;
-    $('client-select').dataset.signature = clientSignature;
-  }
-  $('game-select').disabled = busy;
-  $('client-select').disabled = busy || choices.length < 2;
-  $('launch-title').textContent = selectedGame === 'oldschool' ? 'Old School RuneScape' : 'RuneScape';
+  setText('launch-title', selectedGame === 'oldschool' ? 'Old School RuneScape' : 'RuneScape');
   const clientName = choices.find(client => client.id === status.selectedClient)?.name || '';
   const character = status.characters.some(item => item.accountId === status.selectedCharacter);
-  $('play').disabled = busy || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
-  $('play').textContent = status.clientBusy ? 'Please wait…' : 'Play';
-  $('play-hint').textContent = status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.');
-  $('client-version').textContent = status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName;
+  $('play').disabled = busy || selectingClient || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
+  setText('play', status.clientBusy ? 'Please wait…' : 'Play');
+  setText('play-hint', status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.'));
+  setText('client-version', status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName);
   for (const client of status.clients) {
     const card = $(`client-${client.id}`); if (!card) continue;
     card.disabled = busy; card.classList.toggle('selected', status.selectedClient === client.id);
     card.setAttribute('aria-pressed', String(status.selectedClient === client.id));
     const state = $(`status-${client.id}`);
-    state.textContent = client.busy ? client.message || 'Preparing…' : client.inUse ? 'Running' : !client.available ? client.unavailableReason || 'Unavailable' : client.filesPresent ? 'Installed' : 'Not installed';
+    setText(`status-${client.id}`, client.busy ? client.message || 'Preparing…' : client.inUse ? 'Running' : !client.available ? client.unavailableReason || 'Unavailable' : client.filesPresent ? 'Installed' : 'Not installed');
     state.classList.toggle('running', Boolean(client.inUse));
   }
   const target = status.clients.find(client => client.id === menuClient);
   const blocked = busy || !target || target.busy || target.inUse || !target.filesPresent;
   $('repair-client').disabled = blocked || !target?.available;
   $('uninstall-client').disabled = blocked;
-  $('installed-version').textContent = status.installedVersion || '';
-  $('platform').textContent = status.platform === 'linux' ? 'Linux' : status.platform;
+  setText('installed-version', status.installedVersion || '');
+  setText('platform', status.platform === 'linux' ? 'Linux' : status.platform);
   $('sign-in').disabled = busy || status.signingIn;
-  $('sign-in').textContent = status.signingIn ? 'Waiting for Jagex…' : 'Add account';
+  setText('sign-in', status.signingIn ? 'Waiting for Jagex…' : 'Add account');
   $('reauthenticate').hidden = !status.needsSignIn;
   $('reauthenticate').disabled = busy || status.signingIn;
   $('cancel-login').hidden = !status.signingIn;
   $('account-actions').hidden = !status.signedIn;
-  $('account-message').textContent = status.accountMessage || '';
+  setText('account-message', status.accountMessage || '');
   const accountSignature = JSON.stringify([status.accounts, status.selectedAccount]);
   if ($('accounts').dataset.signature !== accountSignature) {
     $('accounts').replaceChildren();
@@ -138,7 +129,10 @@ function render() {
 async function refresh() {
   if (!invoke) return;
   try {
-    status = await invoke('launcher_status');
+    const revision = selectionRevision;
+    const nextStatus = await invoke('launcher_status');
+    if (selectingClient || revision !== selectionRevision) return;
+    status = nextStatus;
     $('dedicated-gpu-preference').hidden = status.platform !== 'linux';
     if (!$('preferences-form').dataset.loaded) {
       for (const [key, value] of Object.entries(status.settings.preferences)) $('preferences-form').elements.namedItem(key).checked = value;
@@ -149,13 +143,20 @@ async function refresh() {
 }
 
 document.querySelectorAll('[data-page], [data-go]').forEach((button) => button.addEventListener('click', () => page(button.dataset.page || button.dataset.go)));
-$('play').addEventListener('click', () => { if (!busy && status?.clientAvailable && !status?.clientBusy && !status?.clientRunning && !status?.needsSignIn && status?.characters.some(item => item.accountId === status.selectedCharacter)) return action('launch_client'); });
-$('game-select').addEventListener('change', event => {
-  const game = event.target.value;
-  const client = game === 'runescape' ? 'officialRs3' : status.settings.osrsClient || 'runelite';
-  return action('select_client', { game, client });
-});
-$('client-select').addEventListener('change', event => action('select_client', { game: status.settings.selectedGame, client: event.target.value }));
+$('play').addEventListener('click', () => { if (!busy && !selectingClient && status?.clientAvailable && !status?.clientBusy && !status?.clientRunning && !status?.needsSignIn && status?.characters.some(item => item.accountId === status.selectedCharacter)) return action('launch_client'); });
+function selectClient(client) {
+  if (busy || !invoke || !client || (status.selectedClient === client.id && !selectingClient)) return;
+  const revision = ++selectionRevision; selectingClient = true;
+  status.settings.selectedGame = client.game;
+  if (client.game === 'oldschool') status.settings.osrsClient = client.id;
+  status.selectedClient = client.id; status.clientAvailable = client.available;
+  status.clientBusy = client.busy; status.clientVersion = undefined;
+  status.clientMessage = client.message || client.unavailableReason || '';
+  render();
+  selectionQueue = selectionQueue.catch(() => {}).then(() => invoke('select_client', {game:client.game,client:client.id}));
+  return selectionQueue.catch(error => { if (revision === selectionRevision) toast(error,true); })
+    .finally(async () => { if (revision === selectionRevision) { selectingClient = false; await refresh(); } });
+}
 function closeClientMenu() { $('client-menu').hidden = true; menuClient = undefined; }
 function openClientMenu(id, x, y) {
   if (busy) return;
@@ -168,7 +169,7 @@ function openClientMenu(id, x, y) {
 for (const id of ['officialOsrs','runelite','officialRs3']) {
   $(`client-${id}`).addEventListener('click', () => {
     closeClientMenu(); const client = status?.clients.find(client => client.id === id);
-    if (client) return action('select_client', {game:client.game,client:id});
+    if (client) return selectClient(client);
   });
   $(`client-${id}`).addEventListener('contextmenu', event => { event.preventDefault(); openClientMenu(id,event.clientX,event.clientY); });
   $(`client-${id}`).addEventListener('keydown', event => {
@@ -245,7 +246,7 @@ async function checkUpdates() {
 $('check-updates').addEventListener('click', checkUpdates);
 async function initialize() {
   await refresh();
-  if (!status) return;
+  if (!status) { $('play').disabled = true; return; }
   if (invoke) {
     try { await invoke('load_accounts'); } catch (error) { toast(error, true); }
   }
