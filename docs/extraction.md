@@ -1,11 +1,11 @@
 # Launcher extraction
 
-Completed: launcher-only history import, source license retention, Cabbage app ID and executable name, separate platform directories and keyring service, Cabbage desktop entry, update repository, and provisional icon.
+Launcher-only Git history and BSD license notices are retained.
 
-Desktop registration is opt-in through linux/install-desktop-entry.sh. This extraction does not install a desktop entry or launch a GUI on the development machine.
+Cabbage uses its own application ID, platform directories, encrypted vault, keyring service, desktop entry, icons, and GitHub release feed. HapticScape accounts and settings are not imported.
 
-The app ID determines Tauri settings, data, cache, and single-instance identity. The vault encryption purpose and keyring service are both separate from HapticScape. Existing accounts are not migrated.
+HapticScape and LumBridge process controls, connection links, gameplay port checks, suite downloads, legacy migrations, and suite update installers have been removed. Old component paths are discarded when settings are saved.
 
-HapticScape deep-link startup and desktop protocol registration are disabled. The unused implementation remains for removal in phase 2.
+Jagex sign-in, encrypted account storage, account and character selection, renewal logic, preferences, tray controls, and Cabbage release checks remain. RuneLite launch integration is the next phase. Launcher installation and client updates will be implemented separately.
 
-Remaining: remove HapticScape/LumBridge process controls, legacy migrations, inherited suite packaging, and old update formats. Replace them with independent client and launcher management. This is not yet a usable standalone game launcher.
+No desktop entry or installed application is changed by building or testing Cabbage.

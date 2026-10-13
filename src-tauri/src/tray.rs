@@ -20,16 +20,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
                     let _ = window.set_focus();
                 }
             }
-            "exit" => {
-                // Installation must finish before the launcher hands off to its helper.
-                if !app
-                    .state::<crate::AppState>()
-                    .updating
-                    .load(std::sync::atomic::Ordering::SeqCst)
-                {
-                    app.exit(0);
-                }
-            }
+            "exit" => app.exit(0),
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {

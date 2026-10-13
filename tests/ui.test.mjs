@@ -16,9 +16,11 @@ test('launcher content policy prohibits remote scripts and frames', () => {
 });
 
 
-test('first-run installation is declared and allowed only for the local launcher', () => {
+test('obsolete application and suite installation commands are not exposed', () => {
   const build = readFileSync(new URL('../src-tauri/build.rs', import.meta.url), 'utf8');
   const permissions = readFileSync(new URL('../src-tauri/permissions/launcher.toml', import.meta.url), 'utf8');
-  assert.match(build, /"install_components"/);
-  assert.match(permissions, /"install_components"/);
+  for (const command of ['install_components', 'install_update', 'launch_app', 'save_settings', 'launcher_ready']) {
+    assert.ok(!build.includes('"' + command + '"'));
+    assert.ok(!permissions.includes('"' + command + '"'));
+  }
 });
