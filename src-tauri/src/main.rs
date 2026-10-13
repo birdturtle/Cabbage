@@ -811,7 +811,7 @@ fn main() {
                 if let Some(window) = app.get_webview_window("main") { let _ = window.hide(); }
                 let layout = installation_layout(app.handle())?;
                 installation::uninstall(&layout)?;
-                app.exit(0);
+                app.handle().exit(0);
                 return Ok(());
             }
             #[cfg(target_os = "linux")]

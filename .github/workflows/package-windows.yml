@@ -10,6 +10,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check native installation scripts
+        shell: pwsh
+        run: ./scripts/windows-install-smoke.ps1
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
