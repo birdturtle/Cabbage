@@ -1,70 +1,79 @@
 # Cabbage
 
-An unofficial Windows and Linux launcher for RuneScape and Old School RuneScape.
+An unofficial launcher for Old School RuneScape and RuneScape on Windows and Linux.
 
-## Features
+Sign in with your Jagex account, choose a character and client, and press **Play**. Cabbage downloads the client for you and remembers your accounts for next time.
 
-- Jagex sign-in with saved accounts and character selection.
-- RuneLite, official Old School RuneScape, and RuneScape clients.
-- Automatic client downloads.
-- Repair and uninstall from each client's right-click menu.
-- Portable use or installation with application-menu shortcuts.
-- System tray support.
-- Keep the launcher open, hide it to the tray, or close it after Play.
-- Dedicated GPU preference on Linux.
-- Launcher updates with optional beta releases.
+[Download Cabbage](https://github.com/birdturtle/Cabbage/releases/latest)
 
-## Installation
+## Clients
 
-Download the build for your system from [Releases](https://github.com/birdturtle/Cabbage/releases).
+| Client | Windows | Linux |
+| --- | --- | --- |
+| RuneLite | Native | Native |
+| Official Old School RuneScape | Native | Requires Wine |
+| RuneScape | Native | Native |
+
+## Install
+
+Download the file for your system from the [latest release](https://github.com/birdturtle/Cabbage/releases/latest). Both downloads are for x64 systems.
 
 ### Windows
 
-Open `Cabbage-Windows-x64-0.1.0-rc.3.exe` and choose **Install Cabbage** or **Keep portable**. Installation adds Cabbage to the Start Menu and Installed Apps without administrator access.
+1. Open `Cabbage-Windows-x64-1.0.0.exe`.
+2. Choose **Install Cabbage** to add it to your Start Menu, or **Keep portable** to run it from the downloaded file.
 
-[Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) is required. Install it first if it is missing.
+Installation does not require administrator access. [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) is required if it is not already installed.
 
 ### Linux
 
 Make the AppImage executable and open it:
 
 ```sh
-chmod +x Cabbage-Linux-x64-0.1.0-rc.3.AppImage
-./Cabbage-Linux-x64-0.1.0-rc.3.AppImage
+chmod +x Cabbage-Linux-x64-1.0.0.AppImage
+./Cabbage-Linux-x64-1.0.0.AppImage
 ```
 
 Choose **Install Cabbage** to add it to your application menu, or **Keep portable**. Installation does not require sudo.
 
-A desktop keyring providing Secret Service is required for saved accounts. The official Old School client requires Wine. RuneLite and RuneScape run natively.
+Saved accounts require a desktop keyring with Secret Service support. Install Wine if you want to use the official Old School client. RuneLite includes its Java runtime.
 
-### Uninstall
+## Play
 
-Use **Settings > Installation > Uninstall Cabbage**. Windows installations can also be removed through Installed Apps. Saved accounts, preferences, games and caches are kept.
+1. Select **Add account** and sign in with your Jagex account.
+2. Choose your account and character.
+3. Select **OSRS**, **RuneLite** or **RS3** from the client cards at the bottom.
+4. Press **Play**. The first launch downloads and installs the selected client.
+
+You can add multiple accounts and switch between them. Use **Remove** to remove the selected account from Cabbage.
+
+Right-click a client card to **Repair** or **Uninstall** that client.
+
+## Settings
+
+- Keep Cabbage open, hide it to the system tray, or close it after Play.
+- Prefer your dedicated GPU on Linux systems with more than one GPU.
+- Check for launcher updates on startup.
+- Include beta updates if you want to try prereleases.
+
+Closing the window hides Cabbage to the tray when the tray is available. Use the tray menu to restore the window or exit. Exiting Cabbage leaves running games open.
 
 ## Updates
 
-The Updates page checks Cabbage releases. Enable **Include beta updates** to see release candidates.
+Open **Updates**, select **Check for updates**, then **Install update and restart** when a new version is available.
 
-Choose **Install update and restart** to update an installed or portable launcher. Saved accounts, settings and game installations are kept. Running games stay open.
+Updates work with installed and portable copies. Your accounts, settings and downloaded clients are kept, and running games stay open.
 
-RC1 users need to download RC2 manually to enable update installation.
+## Uninstall
 
-## Development
+Use the installation section in **Settings** to uninstall Cabbage. On Windows, you can also use **Installed Apps**.
 
-```sh
-npm ci
-npm run check
-cargo test --manifest-path game-host/Cargo.toml
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run dev
-```
+Uninstalling the launcher keeps saved accounts, settings and downloaded games. Uninstall individual clients from their right-click menus before removing the launcher if you want those removed too.
 
-Build the Linux AppImage with `npm run build -- --bundles appimage`. Build the Windows EXE with `npm run build -- --no-bundle` on Windows.
+## Project
 
-Tauri development requires Node.js and Rust. Linux builds need WebKitGTK 4.1, GTK 3 and Secret Service. Windows builds need the Microsoft C++ build tools and WebView2.
+[Report a bug](https://github.com/birdturtle/Cabbage/issues) · [Build from source](docs/development.md)
 
-## License
-
-BSD 2-Clause. See LICENSE and THIRD-PARTY-NOTICES.md. Based on HapticScape's launcher.
+BSD 2-Clause. See [LICENSE](LICENSE) and [third-party notices](THIRD-PARTY-NOTICES.md). Based on HapticScape's launcher.
 
 Unofficial software. Not affiliated with Jagex or RuneLite.

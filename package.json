@@ -1,6 +1,6 @@
 {
   "name": "cabbage-launcher",
-  "version": "0.1.0-rc.3",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "tauri dev",
