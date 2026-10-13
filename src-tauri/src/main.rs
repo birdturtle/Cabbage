@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod accounts;
 mod auth;
+mod clients;
 mod runelite;
 mod settings;
 mod storage;
@@ -18,7 +19,7 @@ struct AppState {
     account: Mutex<AccountState>,
     wallet: Mutex<()>,
     http: reqwest::Client,
-    runelite: Mutex<runelite::State>,
+    clients: Mutex<clients::Manager>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +34,9 @@ struct Status {
     needs_sign_in: bool,
     account_message: String,
     platform: &'static str,
+    clients: Vec<clients::Descriptor>,
+    selected_client: clients::ClientId,
+    client_available: bool,
     client_running: bool,
     client_busy: bool,
     client_message: String,
@@ -74,12 +78,34 @@ async fn launcher_status(
     local(&window)?;
     let settings = state.settings.lock().unwrap().clone();
     let account = state.account.lock().unwrap();
-    let mut client = state.runelite.lock().unwrap();
+    let selected = settings.selected_client();
+    let key = account
+        .book
+        .selected
+        .clone()
+        .zip(account.book.current().and_then(|s| s.selected.clone()))
+        .map(|(account, character)| clients::LaunchKey { account, character });
+    let mut manager = state.clients.lock().unwrap();
+    manager.reap();
+    let running = key.as_ref().is_some_and(|key| manager.is_running(key));
+    let running_message = key.as_ref().and_then(|key| manager.running_message(key));
+    let progress = manager.progress(selected);
+    let client = progress.lock().unwrap();
     Ok(Status {
-        client_running: client.running(),
+        clients: clients::registry(),
+        selected_client: selected,
+        client_available: selected
+            .unavailable_reason(std::env::consts::OS, std::env::consts::ARCH)
+            .is_none(),
+        client_running: running,
         client_busy: client.busy,
-        client_message: client.message.clone(),
-        client_version: runelite::installed(&client_root(&app)?).map(|i| i.version),
+        client_message: running_message.unwrap_or_else(|| {
+            selected
+                .unavailable_reason(std::env::consts::OS, std::env::consts::ARCH)
+                .map(str::to_owned)
+                .unwrap_or_else(|| client.message.clone())
+        }),
+        client_version: selected.installed_version(&client_root(&app)?),
         accounts: account
             .book
             .accounts
@@ -138,18 +164,15 @@ fn persist_settings(app: &tauri::AppHandle, settings: &Settings) -> Result<(), S
 
 // The wallet lock serializes refresh-token rotation with login, switching and
 // removal. No account/process mutex is held across network requests.
-fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String> {
+fn prepare_play(
+    app: &tauri::AppHandle,
+    target: &clients::LaunchKey,
+) -> Result<Vec<(String, String)>, String> {
     let state = app.state::<AppState>();
     let _wallet = state.wallet.lock().unwrap();
     let mut book = load_book(app)?;
-    let id = book
-        .selected
-        .clone()
-        .ok_or("Sign in and choose a character before playing.")?;
-    let mut session = book
-        .current()
-        .cloned()
-        .ok_or("Sign in and choose a character before playing.")?;
+    let id = target.account.clone();
+    let mut session = book.session_for_launch(&id, &target.character)?.clone();
     if session.needs_sign_in {
         return Err("Sign in again to continue playing.".into());
     }
@@ -168,7 +191,11 @@ fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String>
         &mut session,
         &id,
         |current| {
-            *book.current_mut().unwrap() = current.clone();
+            book.accounts
+                .iter_mut()
+                .find(|a| a.id == id)
+                .unwrap()
+                .session = current.clone();
             persist(&book)
         },
     ));
@@ -181,7 +208,7 @@ fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String>
     let character = session
         .characters
         .iter()
-        .find(|c| Some(&c.account_id) == session.selected.as_ref())
+        .find(|c| c.account_id == target.character)
         .ok_or("Choose a character before playing.")?;
     Ok(vec![
         ("JX_SESSION_ID".into(), session.session_id.clone()),
@@ -193,48 +220,74 @@ fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String>
 fn client_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
-        .map(|p| p.join("clients/runelite"))
-        .map_err(|_| "Cannot locate the RuneLite data directory.".into())
+        .map(|p| p.join("clients"))
+        .map_err(|_| "Cannot locate the client data directory.".into())
 }
 
 #[tauri::command]
-async fn launch_runelite(window: WebviewWindow, app: tauri::AppHandle) -> Result<String, String> {
+fn select_client(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    game: clients::Game,
+    client: clients::ClientId,
+) -> Result<(), String> {
     local(&window)?;
     let state = app.state::<AppState>();
-    {
-        let mut client = state.runelite.lock().unwrap();
-        if client.busy {
-            return Err("RuneLite is already starting.".into());
-        }
-        if client.running() {
-            return Ok("RuneLite is already running.".into());
-        }
-        client.busy = true;
-        client.message = "Preparing RuneLite...".into();
-    }
+    let mut settings = state.settings.lock().unwrap();
+    let mut updated = settings.clone();
+    updated.select(game, client)?;
+    persist_settings(&app, &updated)?;
+    *settings = updated;
+    Ok(())
+}
+
+#[tauri::command]
+async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<String, String> {
+    local(&window)?;
+    let state = app.state::<AppState>();
+    let selected = state.settings.lock().unwrap().selected_client();
+    let (key, name) = {
+        let account = state.account.lock().unwrap();
+        let session = account.book.current().ok_or("Add an account to play.")?;
+        let character = session
+            .characters
+            .iter()
+            .find(|c| Some(&c.account_id) == session.selected.as_ref())
+            .ok_or("Choose a character to play.")?;
+        (
+            clients::LaunchKey {
+                account: account.book.selected.clone().unwrap(),
+                character: character.account_id.clone(),
+            },
+            character.display_name.clone(),
+        )
+    };
+    let progress = state.clients.lock().unwrap().begin(selected, &key)?;
     let handle = app.clone();
+    let target = key.clone();
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         let state = handle.state::<AppState>();
-        let credentials = prepare_play(&handle)?;
         let root = client_root(&handle)?;
-        let install = tauri::async_runtime::block_on(runelite::ensure(&root, &state.runelite))?;
-        let child = runelite::spawn(&root, &install, &credentials)?;
-        let mut client = state.runelite.lock().unwrap();
-        client.child = Some(child);
-        client.message = "RuneLite is running.".into();
+        // Downloads may take time. Renew the captured account/character immediately before spawning.
+        let prepared = tauri::async_runtime::block_on(selected.prepare(&root, &progress))?;
+        let credentials = prepare_play(&handle, &target)?;
+        let child = prepared.spawn(&credentials)?;
+        state
+            .clients
+            .lock()
+            .unwrap()
+            .started(selected, target, name, child);
         Ok(())
     })
     .await;
     let result = result
-        .map_err(|_| "The RuneLite launch task failed.".to_string())
+        .map_err(|_| "The client launch task failed.".to_string())
         .and_then(|r| r);
-    {
-        let mut client = state.runelite.lock().unwrap();
-        client.busy = false;
-        if let Err(error) = &result {
-            client.message = error.clone();
-        }
-    }
+    state
+        .clients
+        .lock()
+        .unwrap()
+        .finish(selected, &key, &result);
     result?;
     if state.settings.lock().unwrap().preferences.minimize_on_play {
         if tray::available(&app) {
@@ -243,7 +296,7 @@ async fn launch_runelite(window: WebviewWindow, app: tauri::AppHandle) -> Result
             let _ = window.minimize();
         }
     }
-    Ok("RuneLite launched.".into())
+    Ok(format!("{} launched.", selected.name()))
 }
 
 fn login_failure(app: &tauri::AppHandle, attempt_id: &str, message: String) {
@@ -391,69 +444,89 @@ async fn begin_login(window: WebviewWindow, app: tauri::AppHandle) -> Result<(),
         account.message = "Complete sign-in in the Jagex window.".into();
     }
     let handle = app.clone();
-    let browser_profile = app.path().app_data_dir()
+    let browser_profile = app
+        .path()
+        .app_data_dir()
         .map_err(|_| "Cannot locate the sign-in browser profile.".to_string())?
         .join("jagex-browser");
     fs::create_dir_all(&browser_profile)
         .map_err(|_| "Cannot create the sign-in browser profile.".to_string())?;
-    let builder = WebviewWindowBuilder::new(&app, "jagex-auth", WebviewUrl::External(url::Url::parse("about:blank").unwrap()))
-        .title("Sign in to Jagex • Cabbage")
-        .inner_size(540.0, 760.0)
-        // Keep challenge cookies and browser storage across login redirects and retries.
-        // This profile is local to Cabbage and has no launcher capabilities.
-        .data_directory(browser_profile)
-        .devtools(false)
-        .on_navigation(move |url| {
-            // No remote window gets launcher IPC. Intercept callbacks before a network request.
-            match auth::callback(url) {
-                Ok(Some(callback)) => {
-                    let app = handle.clone();
-                    tauri::async_runtime::spawn(handle_callback(app, callback));
-                    false
-                }
-                Err(error) => {
-                    let app = handle.clone();
-                    let state = app.state::<AppState>();
-                    let id = state
-                        .account
-                        .lock()
-                        .unwrap()
-                        .attempt
-                        .as_ref()
-                        .map(|a| a.state.clone());
-                    if let Some(id) = id {
-                        tauri::async_runtime::spawn(async move {
-                            login_failure(&app, &id, error);
-                        });
-                    }
-                    false
-                }
-                Ok(None) => {
-                    let allowed = auth::allow_browser_navigation(url);
-                    // Never print paths, query strings, fragments, or auth responses.
-                    eprintln!(
-                        "Jagex browser navigation: scheme={} host={} allowed={}",
-                        url.scheme(),
-                        url.host_str().unwrap_or("(none)"),
-                        allowed
-                    );
-                    allowed
-                }
+    let builder = WebviewWindowBuilder::new(
+        &app,
+        "jagex-auth",
+        WebviewUrl::External(url::Url::parse("about:blank").unwrap()),
+    )
+    .title("Sign in to Jagex • Cabbage")
+    .inner_size(540.0, 760.0)
+    // Keep challenge cookies and browser storage across login redirects and retries.
+    // This profile is local to Cabbage and has no launcher capabilities.
+    .data_directory(browser_profile)
+    .devtools(false)
+    .on_navigation(move |url| {
+        // No remote window gets launcher IPC. Intercept callbacks before a network request.
+        match auth::callback(url) {
+            Ok(Some(callback)) => {
+                let app = handle.clone();
+                tauri::async_runtime::spawn(handle_callback(app, callback));
+                false
             }
-        });
+            Err(error) => {
+                let app = handle.clone();
+                let state = app.state::<AppState>();
+                let id = state
+                    .account
+                    .lock()
+                    .unwrap()
+                    .attempt
+                    .as_ref()
+                    .map(|a| a.state.clone());
+                if let Some(id) = id {
+                    tauri::async_runtime::spawn(async move {
+                        login_failure(&app, &id, error);
+                    });
+                }
+                false
+            }
+            Ok(None) => {
+                let allowed = auth::allow_browser_navigation(url);
+                // Never print paths, query strings, fragments, or auth responses.
+                eprintln!(
+                    "Jagex browser navigation: scheme={} host={} allowed={}",
+                    url.scheme(),
+                    url.host_str().unwrap_or("(none)"),
+                    allowed
+                );
+                allowed
+            }
+        }
+    });
     match builder.build() {
         Ok(auth_window) => {
             #[cfg(target_os = "linux")]
-            auth_window.with_webview(|webview| {
-                use webkit2gtk::WebViewExt;
-                webview.inner().connect_load_failed(|_, _, failed_uri, error| {
-                    let host = url::Url::parse(failed_uri).ok().and_then(|u| u.host_str().map(str::to_owned)).unwrap_or_default();
-                    // Never log redirect paths, codes, tokens, or page content.
-                    eprintln!("Jagex browser load failed: host={} domain={:?} network_error={:?}", host, error.domain(), error.kind::<webkit2gtk::NetworkError>());
-                    false
-                });
-            }).map_err(|_| "Cannot initialize the sign-in browser.".to_string())?;
-            auth_window.navigate(url).map_err(|_| "Cannot open Jagex sign-in.".to_string())?;
+            auth_window
+                .with_webview(|webview| {
+                    use webkit2gtk::WebViewExt;
+                    webview
+                        .inner()
+                        .connect_load_failed(|_, _, failed_uri, error| {
+                            let host = url::Url::parse(failed_uri)
+                                .ok()
+                                .and_then(|u| u.host_str().map(str::to_owned))
+                                .unwrap_or_default();
+                            // Never log redirect paths, codes, tokens, or page content.
+                            eprintln!(
+                                "Jagex browser load failed: host={} domain={:?} network_error={:?}",
+                                host,
+                                error.domain(),
+                                error.kind::<webkit2gtk::NetworkError>()
+                            );
+                            false
+                        });
+                })
+                .map_err(|_| "Cannot initialize the sign-in browser.".to_string())?;
+            auth_window
+                .navigate(url)
+                .map_err(|_| "Cannot open Jagex sign-in.".to_string())?;
             let app = app.clone();
             auth_window.on_window_event(move |event| {
                 if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -628,7 +701,7 @@ fn main() {
                 settings: Mutex::new(settings),
                 account: Mutex::new(AccountState::default()),
                 wallet: Mutex::new(()),
-                runelite: Mutex::new(runelite::State::default()),
+                clients: Mutex::new(clients::Manager::default()),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
                     .redirect(reqwest::redirect::Policy::none())
@@ -652,7 +725,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             launcher_status,
-            launch_runelite,
+            launch_client,
+            select_client,
             save_preferences,
             begin_login,
             cancel_login,

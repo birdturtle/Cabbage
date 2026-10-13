@@ -13,34 +13,7 @@ const MAX_DOWNLOAD: u64 = 200 * 1024 * 1024;
 const MAX_EXPANDED: u64 = 600 * 1024 * 1024;
 const REPOSITORY: &str = "runelite/launcher";
 
-#[derive(Default)]
-pub struct State {
-    pub busy: bool,
-    pub child: Option<Child>,
-    pub message: String,
-}
-impl State {
-    pub fn running(&mut self) -> bool {
-        if let Some(child) = self.child.as_mut() {
-            match child.try_wait() {
-                Ok(None) => return true,
-                Ok(Some(exit)) => {
-                    self.message = if exit.success() {
-                        "RuneLite closed.".into()
-                    } else {
-                        "RuneLite exited unexpectedly. See the RuneLite launch log in Cabbage's data folder.".into()
-                    };
-                    self.child = None;
-                }
-                Err(_) => {
-                    self.message = "Cannot check the RuneLite process.".into();
-                    return true;
-                }
-            }
-        }
-        false
-    }
-}
+use crate::clients::Progress as State;
 #[derive(Clone, Deserialize)]
 struct Asset {
     name: String,
@@ -578,28 +551,6 @@ mod tests {
         );
         // Keep verified files for an optional manual launch; no account data is used.
     }
-    #[test]
-    fn closed_process_clears_running_status() {
-        let mut command = if cfg!(windows) {
-            let mut c = Command::new("cmd");
-            c.args(["/C", "exit", "0"]);
-            c
-        } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", "exit 0"]);
-            c
-        };
-        let mut child = command.spawn().unwrap();
-        child.wait().unwrap();
-        let mut state = State {
-            child: Some(child),
-            ..State::default()
-        };
-        assert!(!state.running());
-        assert!(state.child.is_none());
-        assert_eq!(state.message, "RuneLite closed.");
-    }
-
     #[test]
     fn credentials_are_only_passed_in_the_environment_and_legacy_tokens_are_removed() {
         let install = Installed {

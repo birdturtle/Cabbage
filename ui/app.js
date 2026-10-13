@@ -50,11 +50,27 @@ function render() {
   $('play').textContent = busy ? 'Starting…' : 'Play';
   $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
   if (!status) return;
+  const selectedGame = status.settings.selectedGame;
+  const choices = status.clients.filter(client => client.game === selectedGame);
+  $('game-select').value = selectedGame;
+  const clientSignature = JSON.stringify([choices, status.selectedClient]);
+  if ($('client-select').dataset.signature !== clientSignature) {
+    $('client-select').replaceChildren();
+    for (const client of choices) {
+      const option = document.createElement('option'); option.value = client.id; option.textContent = client.name; $('client-select').append(option);
+    }
+    $('client-select').value = status.selectedClient;
+    $('client-select').dataset.signature = clientSignature;
+  }
+  $('game-select').disabled = busy;
+  $('client-select').disabled = busy || choices.length < 2;
+  $('launch-title').textContent = selectedGame === 'oldschool' ? 'Old School RuneScape' : 'RuneScape';
+  const clientName = choices.find(client => client.id === status.selectedClient)?.name || '';
   const character = status.characters.some(item => item.accountId === status.selectedCharacter);
-  $('play').disabled = busy || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
+  $('play').disabled = busy || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn;
   $('play').textContent = status.clientBusy ? 'Starting…' : 'Play';
   $('play-hint').textContent = status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.');
-  $('client-version').textContent = status.clientVersion ? `RuneLite ${status.clientVersion}` : 'RuneLite';
+  $('client-version').textContent = status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName;
   $('installed-version').textContent = status.installedVersion || '';
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : status.platform;
   $('sign-in').disabled = busy || status.signingIn;
@@ -117,7 +133,13 @@ async function refresh() {
 }
 
 document.querySelectorAll('[data-page], [data-go]').forEach((button) => button.addEventListener('click', () => page(button.dataset.page || button.dataset.go)));
-$('play').addEventListener('click', () => { if (!busy && !status?.clientBusy && !status?.clientRunning && !status?.needsSignIn && status?.characters.some(item => item.accountId === status.selectedCharacter)) return action('launch_runelite'); });
+$('play').addEventListener('click', () => { if (!busy && status?.clientAvailable && !status?.clientBusy && !status?.clientRunning && !status?.needsSignIn && status?.characters.some(item => item.accountId === status.selectedCharacter)) return action('launch_client'); });
+$('game-select').addEventListener('change', event => {
+  const game = event.target.value;
+  const client = game === 'runescape' ? 'officialRs3' : status.settings.osrsClient || 'runelite';
+  return action('select_client', { game, client });
+});
+$('client-select').addEventListener('change', event => action('select_client', { game: status.settings.selectedGame, client: event.target.value }));
 $('accounts').addEventListener('change', (event) => action('select_account', { id: event.target.value }));
 $('remove-account').addEventListener('click', () => { if (status?.selectedAccount) action('remove_account', { id: status.selectedAccount }); });
 for (const [id, command] of [['sign-in', 'begin_login'], ['cancel-login', 'cancel_login']]) $(id).addEventListener('click', () => action(command));

@@ -19,6 +19,18 @@ impl AccountBook {
             .find(|a| Some(&a.id) == self.selected.as_ref())
             .map(|a| &a.session)
     }
+    pub fn session_for_launch(&self, account: &str, character: &str) -> Result<&Session, String> {
+        let session = &self
+            .accounts
+            .iter()
+            .find(|a| a.id == account)
+            .ok_or("The selected account is no longer available.")?
+            .session;
+        if !session.characters.iter().any(|c| c.account_id == character) {
+            return Err("The selected character is no longer available.".into());
+        }
+        Ok(session)
+    }
     pub fn current_mut(&mut self) -> Option<&mut Session> {
         self.accounts
             .iter_mut()
@@ -115,6 +127,25 @@ mod tests {
             oauth_id_token: None,
             needs_sign_in: false,
         }
+    }
+    #[test]
+    fn queued_launch_keeps_its_account_when_selection_changes() {
+        let mut book = AccountBook::default();
+        let mut first = session("a");
+        first.session_id = "first-session".into();
+        let mut second = session("b");
+        second.session_id = "second-session".into();
+        book.add("first".into(), first);
+        book.add("second".into(), second);
+        book.select("second").unwrap();
+        assert_eq!(
+            book.session_for_launch("first", "a").unwrap().session_id,
+            "first-session"
+        );
+        assert_eq!(book.current().unwrap().session_id, "second-session");
+        assert!(book.session_for_launch("first", "b").is_err());
+        book.remove("first").unwrap();
+        assert!(book.session_for_launch("first", "a").is_err());
     }
     #[test]
     fn added_accounts_survive_round_trip_switching_and_individual_removal() {

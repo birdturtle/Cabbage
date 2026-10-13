@@ -21,6 +21,12 @@ Saved accounts use AES-GCM encryption with a key held in Windows Credential Mana
 
 Cabbage uses `com.birdturtle.cabbage` for application storage and `com.birdturtle.cabbage.jagex.v1` for its account-vault key. HapticScape accounts and settings are not imported.
 
+## Game and client selection
+
+Choose Old School RuneScape or RuneScape, then a client. RuneLite is currently playable. Official client options remain unavailable while their integrations are being built. Cabbage remembers the selected game and Old School client.
+
+Launches are tracked per account and character. Different characters can have separate RuneLite sessions; launching the same character twice is blocked. Live acceptance through the new manager is still required.
+
 ## Planned clients
 
 - Old School RuneScape: RuneLite and the official client.

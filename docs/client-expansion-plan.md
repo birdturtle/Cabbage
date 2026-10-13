@@ -72,3 +72,7 @@ Jagex's [launcher and client download links](https://support.runescape.com/hc/en
 ## Research progress
 
 See [official-client-contracts.md](official-client-contracts.md) for the inspected Jagex Linux beta, verified OSRS content reconstruction, and RS3 bootstrap/dependency findings. Static research is complete for these artifacts; isolated runtime probes and authenticated Windows/Linux acceptance remain outstanding. The next implementation step is the shared manager with RuneLite regression coverage.
+
+## Shared manager milestone
+
+The shared registry/manager and game/client selectors are implemented with RuneLite as the active adapter. Official clients remain unavailable. See client-manager.md. Existing RuneLite paths and account/browser state are preserved. Regression tests pass locally; live launch through the manager is the next acceptance check.
