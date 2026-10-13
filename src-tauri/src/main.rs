@@ -96,10 +96,21 @@ async fn launcher_status(
     manager.reap();
     let running = key.as_ref().is_some_and(|key| manager.is_running(key));
     let running_message = key.as_ref().and_then(|key| manager.running_message(key));
+    let mut descriptors = clients::registry();
+    let root = client_root(&app)?;
+    for descriptor in &mut descriptors {
+        descriptor.files_present =
+            maintenance::has_files(&root.join(descriptor.id.directory()), descriptor.id);
+        descriptor.in_use = manager.client_in_use(descriptor.id);
+        let progress = manager.progress(descriptor.id);
+        let progress = progress.lock().unwrap();
+        descriptor.busy = progress.busy;
+        descriptor.message = progress.message.clone();
+    }
     let progress = manager.progress(selected);
     let client = progress.lock().unwrap();
     Ok(Status {
-        clients: clients::registry(),
+        clients: descriptors,
         selected_client: selected,
         client_available: selected
             .unavailable_reason(std::env::consts::OS, std::env::consts::ARCH)

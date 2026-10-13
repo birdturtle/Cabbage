@@ -1,6 +1,6 @@
 # Client repair and uninstall
 
-Settings contains Client files for the game/client selected on Home. Repair downloads and verifies fresh managed binaries before replacing the existing installation. Uninstall asks for confirmation and removes Cabbage-managed binaries. Saved accounts, browser profiles, launcher preferences, game settings and caches remain.
+Home displays OSRS, RuneLite and RS3 across its bottom row. Clicking an entry selects that client. Right-click or Shift+F10 opens Repair and Uninstall for that entry, independently of the selected client. Repair downloads and verifies fresh managed binaries before replacing the existing installation. Uninstall asks for confirmation and removes Cabbage-managed binaries. Saved accounts, browser profiles, launcher preferences, game settings and caches remain.
 
 Managed paths per adapter:
 

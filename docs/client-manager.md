@@ -14,4 +14,4 @@ The frontend offers game/client selectors, selected-client status, and availabil
 
 Validation covers old-settings migration, game/client compatibility, saved choices, unavailable adapters, duplicate reservations, retry after failure, independent process tracking, captured account lookup, and frontend selection/launch behavior. Live RuneLite acceptance and Windows CI are separate checks.
 
-Client maintenance is implemented in Settings. Reservations cover all tracked characters for the selected client, and an independent process check protects games left running after launcher exit. See client-maintenance.md for managed paths and interrupted-replacement recovery.
+Client maintenance is available from each bottom client entry’s right-click menu on Home. Reservations cover all tracked characters for the selected client, and an independent process check protects games left running after launcher exit. See client-maintenance.md for managed paths and interrupted-replacement recovery.

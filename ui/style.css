@@ -127,3 +127,14 @@ dialog::backdrop { background:rgba(0,0,0,.65); }
 dialog h2 { margin-top:0; }
 dialog p { color:var(--muted); }
 dialog .action-row { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+
+.client-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.client-card { color:var(--text); text-align:left; min-width:0; border-left:3px solid var(--border); }
+.client-card:hover:not(:disabled) { background:var(--raised); border-color:var(--hover); }
+.client-card.selected { border-left-color:var(--accent); background:var(--raised); }
+.client-card .app-status { display:block; }
+.client-emblem { display:grid; place-items:center; width:36px; height:36px; flex-shrink:0; background:var(--canvas); border:1px solid var(--border); color:var(--accent); font-weight:600; font-size:12px; }
+.client-menu { position:fixed; z-index:20; min-width:150px; padding:4px; background:var(--surface); border:1px solid var(--hover); box-shadow:0 6px 16px #0008; }
+.client-menu button { display:block; width:100%; text-align:left; padding:8px 14px; border:0; color:var(--text); background:transparent; }
+.client-menu button:hover:not(:disabled),.client-menu button:focus-visible { background:var(--selection); }
+@media(max-width:700px) { .client-grid { overflow-x:auto; grid-template-columns:repeat(3,minmax(160px,1fr)); } }

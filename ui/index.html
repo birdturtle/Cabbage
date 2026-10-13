@@ -43,6 +43,11 @@
             </div>
           </div>
         </article>
+        <div class="app-grid client-grid" aria-label="Game clients">
+          <button class="app-card client-card" id="client-officialOsrs" aria-haspopup="menu"><span class="client-emblem" aria-hidden="true">OS</span><span class="app-info"><strong>OSRS</strong><span class="app-status" id="status-officialOsrs">Not installed</span></span></button>
+          <button class="app-card client-card" id="client-runelite" aria-haspopup="menu"><span class="client-emblem" aria-hidden="true">RL</span><span class="app-info"><strong>RuneLite</strong><span class="app-status" id="status-runelite">Not installed</span></span></button>
+          <button class="app-card client-card" id="client-officialRs3" aria-haspopup="menu"><span class="client-emblem" aria-hidden="true">RS</span><span class="app-info"><strong>RS3</strong><span class="app-status" id="status-officialRs3">Not installed</span></span></button>
+        </div>
       </section>
       <section class="page" id="updates" hidden>
         <article class="panel"><div class="panel-heading"><h2>Cabbage releases</h2><button class="button" id="check-updates">Check for updates</button></div><p id="release-summary">Check the latest published release.</p><h3 id="release-name" hidden></h3><pre id="release-notes" hidden></pre></article>
@@ -58,17 +63,15 @@
           <label class="preference-row"><input type="checkbox" name="includeBetaUpdates"><span>Include beta updates</span></label>
           <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
         </form>
-        <section class="panel" aria-labelledby="client-files-heading">
-          <h2 id="client-files-heading">Client files</h2>
-          <p id="managed-client-name"></p>
-          <p id="client-maintenance-status" role="status"></p>
-          <div class="action-row"><button class="button" id="repair-client">Repair</button><button class="button remove-button" id="uninstall-client">Uninstall</button></div>
-        </section>
         <p class="help-text">Closing the window hides the launcher to the tray. Tray Exit closes Cabbage.</p>
       </section>
     </div>
     <footer><span>Cabbage</span><span class="image-disclaimer">RuneScape imagery © Jagex Ltd. Unofficial launcher; not affiliated with Jagex.</span></footer>
   </main>
+  <div class="client-menu" id="client-menu" role="menu" aria-label="Client options" hidden>
+    <button id="repair-client" role="menuitem">Repair</button>
+    <button id="uninstall-client" role="menuitem">Uninstall</button>
+  </div>
   <dialog id="uninstall-dialog" aria-labelledby="uninstall-title">
     <h2 id="uninstall-title">Uninstall client?</h2>
     <p>Remove this client's files? Saved accounts, game settings and caches are kept.</p>

@@ -11,6 +11,7 @@ function launcher(preferences, options = {}) {
     if (!elements.has(id)) elements.set(id, {
       dataset: {}, checked: false, children: [], listeners: {},
       querySelectorAll: () => [],
+      style:{}, focus(){}, contains(){return true;}, getBoundingClientRect(){return {width:150,height:80,left:30,bottom:60};},
       setAttribute() {}, showModal(){this.open=true;}, close(){this.open=false;},
       classList: { toggle() {} },
       elements: { namedItem: (name) => element(`${id}:${name}`) },
@@ -24,8 +25,12 @@ function launcher(preferences, options = {}) {
     settings: { preferences, selectedGame: 'oldschool', osrsClient: 'runelite' }, selectedClient: 'runelite', clientAvailable: true, clients: [{id: 'runelite', game: 'oldschool', name: 'RuneLite', available: true}, {id: 'officialOsrs', game: 'oldschool', name: 'Official', available: true}, {id: 'officialRs3', game: 'runescape', name: 'Official', available: true}], platform: 'linux', accounts: [], characters: [],
     ...options.status,
   };
+  for (const client of status.clients) {
+    client.filesPresent ??= status.clientFilesPresent || false;
+    client.inUse ??= status.clientInUse || false; client.busy ??= false;
+  }
   runInNewContext(readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8'), {
-    window: { __TAURI__: { core: { async invoke(command, args) {
+    window: {innerWidth:1200,innerHeight:800,addEventListener(){}, __TAURI__: { core: { async invoke(command, args) {
       calls.push({ command, args });
       if (command === 'launcher_status') return status;
       if (command === 'check_updates') {
@@ -42,7 +47,7 @@ function launcher(preferences, options = {}) {
       }
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
     } } } },
-    document: { getElementById: element, querySelectorAll: () => [], createElement: () => element(`option:${Math.random()}`), createElementNS: () => element(`svg:${Math.random()}`) },
+    document: {addEventListener(){}, getElementById: element, querySelectorAll: () => [], createElement: () => element(`option:${Math.random()}`), createElementNS: () => element(`svg:${Math.random()}`) },
     setTimeout: () => 1, clearTimeout() {}, setInterval(callback) { poll = callback; },
   });
   return { calls, element, status, poll: () => poll() };
@@ -185,9 +190,11 @@ test('dedicated GPU preference loads, survives polling, and saves on Linux', asy
 test('repair captures the selected client and running clients block maintenance', async () => {
   const app = launcher({checkUpdatesOnStartup:false}, {status:{clientFilesPresent:true,clientInUse:false,clientBusy:false}});
   await settle();
+  app.element('client-runelite').listeners.contextmenu({preventDefault(){},clientX:20,clientY:30});
   await app.element('repair-client').listeners.click();
   assert.equal(app.calls.find(call => call.command === 'maintain_client').args.client, 'runelite');
-  app.status.clientInUse=true; await app.poll();
+  app.status.clientInUse=true; app.status.clients[0].inUse=true;
+  app.element('client-runelite').listeners.contextmenu({preventDefault(){},clientX:20,clientY:30}); await app.poll();
   assert.equal(app.element('repair-client').disabled, true);
   assert.equal(app.element('uninstall-client').disabled, true);
   await app.element('repair-client').listeners.click();
@@ -198,15 +205,30 @@ test('repair captures the selected client and running clients block maintenance'
 test('uninstall needs confirmation and preserves the originally selected client', async () => {
   const app = launcher({checkUpdatesOnStartup:false}, {status:{clientFilesPresent:true,clientInUse:false,clientBusy:false}});
   await settle();
+  app.element('client-runelite').listeners.contextmenu({preventDefault(){},clientX:20,clientY:30});
   app.element('uninstall-client').listeners.click();
   assert.equal(app.element('uninstall-dialog').open,true);
   assert.ok(!app.calls.some(call => call.command === 'maintain_client'));
   app.element('cancel-uninstall').listeners.click();
   await app.element('confirm-uninstall').listeners.click();
   assert.ok(!app.calls.some(call => call.command === 'maintain_client'));
+  app.element('client-runelite').listeners.contextmenu({preventDefault(){},clientX:20,clientY:30});
   app.element('uninstall-client').listeners.click();
   app.status.selectedClient='officialRs3';
   await app.element('confirm-uninstall').listeners.click();
   const call=app.calls.find(call => call.command === 'maintain_client');
   assert.equal(call.args.client,'runelite'); assert.equal(call.args.operation,'uninstall');
+});
+
+test('bottom client entries select clients and right-click targets the clicked entry', async () => {
+  const app = launcher({checkUpdatesOnStartup:false}); await settle();
+  const rs3 = app.status.clients.find(client => client.id==='officialRs3'); rs3.filesPresent=true;
+  app.element('client-officialRs3').listeners.contextmenu({preventDefault(){},clientX:1180,clientY:790});
+  assert.equal(app.element('client-menu').hidden,false);
+  await app.element('repair-client').listeners.click();
+  assert.equal(app.calls.find(call => call.command==='maintain_client').args.client,'officialRs3');
+  assert.equal(app.status.selectedClient,'runelite');
+  await app.element('client-officialRs3').listeners.click();
+  assert.equal(app.status.selectedClient,'officialRs3');
+  assert.equal(app.element('status-officialRs3').textContent,'Installed');
 });

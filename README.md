@@ -29,7 +29,7 @@ Launches are tracked per account and character. Different characters can have se
 
 ## Client files
 
-Select a client on Home, then open Settings to repair or uninstall it. Repair replaces managed client files. Uninstall keeps saved accounts, game settings and caches. Close the client before using either action.
+Right-click OSRS, RuneLite or RS3 at the bottom of Home to repair or uninstall it. Repair replaces managed client files. Uninstall keeps saved accounts, game settings and caches. Close the client before using either action.
 
 ## Planned clients
 

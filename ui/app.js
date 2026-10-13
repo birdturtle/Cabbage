@@ -5,6 +5,8 @@ let checkingUpdates = false;
 let updateFeedback = false;
 let toastTimer;
 let pendingUninstall;
+let menuClient;
+const clientLabels = {officialOsrs:"OSRS",runelite:"RuneLite",officialRs3:"RS3"};
 const $ = (id) => document.getElementById(id);
 
 function page(name) {
@@ -72,11 +74,18 @@ function render() {
   $('play').textContent = status.clientBusy ? 'Please wait…' : 'Play';
   $('play-hint').textContent = status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.');
   $('client-version').textContent = status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName;
-  $('managed-client-name').textContent = `${selectedGame === 'runescape' ? 'RuneScape' : 'Old School RuneScape'} · ${clientName}`;
-  $('client-maintenance-status').textContent = status.clientMessage || (status.clientFilesPresent ? status.clientVersion ? `Installed: ${status.clientVersion}` : 'Client files need repair.' : 'Not installed. Play installs this client.');
-  const maintenanceBlocked = busy || status.clientBusy || status.clientInUse || !status.clientFilesPresent;
-  $('repair-client').disabled = maintenanceBlocked || !status.clientAvailable;
-  $('uninstall-client').disabled = maintenanceBlocked;
+  for (const client of status.clients) {
+    const card = $(`client-${client.id}`); if (!card) continue;
+    card.disabled = busy; card.classList.toggle('selected', status.selectedClient === client.id);
+    card.setAttribute('aria-pressed', String(status.selectedClient === client.id));
+    const state = $(`status-${client.id}`);
+    state.textContent = client.busy ? client.message || 'Preparing…' : client.inUse ? 'Running' : !client.available ? client.unavailableReason || 'Unavailable' : client.filesPresent ? 'Installed' : 'Not installed';
+    state.classList.toggle('running', Boolean(client.inUse));
+  }
+  const target = status.clients.find(client => client.id === menuClient);
+  const blocked = busy || !target || target.busy || target.inUse || !target.filesPresent;
+  $('repair-client').disabled = blocked || !target?.available;
+  $('uninstall-client').disabled = blocked;
   $('installed-version').textContent = status.installedVersion || '';
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : status.platform;
   $('sign-in').disabled = busy || status.signingIn;
@@ -147,13 +156,48 @@ $('game-select').addEventListener('change', event => {
   return action('select_client', { game, client });
 });
 $('client-select').addEventListener('change', event => action('select_client', { game: status.settings.selectedGame, client: event.target.value }));
+function closeClientMenu() { $('client-menu').hidden = true; menuClient = undefined; }
+function openClientMenu(id, x, y) {
+  if (busy) return;
+  menuClient = id; const menu = $('client-menu'); menu.hidden = false; render();
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  for (const id of ['repair-client','uninstall-client']) if (!$(id).disabled) { $(id).focus(); break; }
+}
+for (const id of ['officialOsrs','runelite','officialRs3']) {
+  $(`client-${id}`).addEventListener('click', () => {
+    closeClientMenu(); const client = status?.clients.find(client => client.id === id);
+    if (client) return action('select_client', {game:client.game,client:id});
+  });
+  $(`client-${id}`).addEventListener('contextmenu', event => { event.preventDefault(); openClientMenu(id,event.clientX,event.clientY); });
+  $(`client-${id}`).addEventListener('keydown', event => {
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect(); openClientMenu(id,rect.left,rect.bottom);
+    }
+  });
+}
+document.addEventListener('pointerdown', event => { if (!$('client-menu').contains(event.target)) closeClientMenu(); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { const id = menuClient; closeClientMenu(); if (id) $(`client-${id}`).focus(); }
+  if (!$('client-menu').hidden && ['ArrowDown','ArrowUp'].includes(event.key)) {
+    event.preventDefault(); const entries = ['repair-client','uninstall-client'].map($).filter(item => !item.disabled);
+    if (entries.length) { const current = entries.indexOf(document.activeElement); entries[(current + (event.key === 'ArrowDown' ? 1 : entries.length-1) + entries.length) % entries.length].focus(); }
+  }
+});
+window.addEventListener('resize', closeClientMenu);
+document.addEventListener('scroll', closeClientMenu, true);
 $('repair-client').addEventListener('click', () => {
-  if (!busy && status?.clientAvailable && status?.clientFilesPresent && !status.clientBusy && !status.clientInUse) return action('maintain_client', {client:status.selectedClient,operation:'repair'});
+  const client = status?.clients.find(client => client.id === menuClient);
+  if (!busy && client?.available && client.filesPresent && !client.busy && !client.inUse) {
+    closeClientMenu(); return action('maintain_client', {client:client.id,operation:'repair'});
+  }
 });
 $('uninstall-client').addEventListener('click', () => {
-  if (busy || !status?.clientFilesPresent || status.clientBusy || status.clientInUse) return;
-  pendingUninstall = status.selectedClient;
-  $('uninstall-title').textContent = `Uninstall ${$('managed-client-name').textContent}?`;
+  const client = status?.clients.find(client => client.id === menuClient);
+  if (busy || !client?.filesPresent || client.busy || client.inUse) return;
+  pendingUninstall = client.id; closeClientMenu();
+  $('uninstall-title').textContent = `Uninstall ${clientLabels[client.id]}?`;
   $('uninstall-dialog').showModal();
 });
 $('cancel-uninstall').addEventListener('click', () => { pendingUninstall = undefined; $('uninstall-dialog').close(); });

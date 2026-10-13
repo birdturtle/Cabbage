@@ -173,6 +173,10 @@ pub struct Descriptor {
     pub name: &'static str,
     pub available: bool,
     pub unavailable_reason: Option<&'static str>,
+    pub files_present: bool,
+    pub busy: bool,
+    pub in_use: bool,
+    pub message: String,
 }
 pub fn registry() -> Vec<Descriptor> {
     [
@@ -190,6 +194,10 @@ pub fn registry() -> Vec<Descriptor> {
             name: id.name(),
             available: unavailable_reason.is_none(),
             unavailable_reason,
+            files_present: false,
+            busy: false,
+            in_use: false,
+            message: String::new(),
         }
     })
     .collect()
