@@ -92,3 +92,17 @@ jobs:
           fi
       - name: Verify reinstall command syntax
         run: dnf --refresh --setopt=assumeyes=False --setopt=assumeno=False reinstall --help
+
+  opensuse-packages:
+    name: Dependency transaction (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['opensuse/tumbleweed:latest', 'opensuse/leap:16.0']
+    container: ${{ matrix.image }}
+    steps:
+      - name: Verify Zypper parser and resolve dependencies without installing
+        run: |
+          zypper refresh
+          zypper --non-interactive install --dry-run --force --no-allow-vendor-change wine gnome-keyring xwayland 'libSDL2-2.0.so.0()(64bit)' 'libEGL.so.1()(64bit)' 'libOpenGL.so.0()(64bit)' 'libGL.so.1()(64bit)' 'libX11.so.6()(64bit)' 'libXext.so.6()(64bit)' 'libXi.so.6()(64bit)' 'libXrender.so.1()(64bit)' 'libXtst.so.6()(64bit)' 'libfreetype.so.6()(64bit)' 'libfontconfig.so.1()(64bit)' 'libasound.so.2()(64bit)'

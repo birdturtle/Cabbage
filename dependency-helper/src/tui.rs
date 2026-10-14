@@ -254,7 +254,7 @@ pub fn run() -> Result<(), String> {
             probe(client)
         };
         if !plan.supported {
-            return Err("Automatic setup supports Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04 and Fedora 43/44 on x64.".into());
+            return Err("Automatic setup supports Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04 Fedora 43/44 and openSUSE Tumbleweed/Leap 16.0 on x64.".into());
         }
         if plan.missing.is_empty() {
             report(Phase::Finished, "Requirements are already installed.")?;

@@ -35,6 +35,7 @@ pub enum Backend {
     Pacman,
     Apt { t64: bool },
     Dnf,
+    Zypper,
     Unsupported,
 }
 impl Backend {
@@ -43,12 +44,14 @@ impl Backend {
             Self::Pacman => "/usr/bin/pacman",
             Self::Apt { .. } => "/usr/bin/apt-get",
             Self::Dnf => "/usr/bin/dnf",
+            Self::Zypper => "/usr/bin/zypper",
             Self::Unsupported => "",
         }
     }
     pub fn notice(self) -> &'static str {
         match self {
             Self::Pacman => "This also updates installed system packages.\nPacman will show the full transaction before you approve it.",
+            Self::Zypper => "Repository metadata will be refreshed before installation.\nZypper will show the full transaction before you approve it.",
             Self::Dnf => "Repository metadata will be refreshed before installation.\nDNF will show the full transaction before you approve it.",
             _ => "Package lists will be refreshed before installation.\nAPT will show the full transaction before you approve it.",
         }
@@ -82,6 +85,15 @@ impl Backend {
             }
         } else {
             arch
+        }
+    }
+    pub fn library_package(self, file: &str, package: &str) -> String {
+        if self == Self::Zypper {
+            format!("{file}()(64bit)")
+        } else if package == "libglvnd" {
+            self.graphics_package(file).into()
+        } else {
+            self.package(package).into()
         }
     }
     pub fn graphics_package(self, file: &str) -> &'static str {
@@ -184,6 +196,23 @@ impl Plan {
                 "fontconfig",
                 "alsa-lib",
             ],
+            Backend::Zypper => &[
+                "wine",
+                "gnome-keyring",
+                "xwayland",
+                "libSDL2-2.0.so.0()(64bit)",
+                "libEGL.so.1()(64bit)",
+                "libOpenGL.so.0()(64bit)",
+                "libGL.so.1()(64bit)",
+                "libX11.so.6()(64bit)",
+                "libXext.so.6()(64bit)",
+                "libXi.so.6()(64bit)",
+                "libXrender.so.1()(64bit)",
+                "libXtst.so.6()(64bit)",
+                "libfreetype.so.6()(64bit)",
+                "libfontconfig.so.1()(64bit)",
+                "libasound.so.2()(64bit)",
+            ],
             Backend::Unsupported => return Err("Unsupported package manager.".into()),
         };
         if packages.iter().any(|p| !allowed.contains(&p.as_str())) {
@@ -220,6 +249,16 @@ impl Plan {
             .iter()
             .map(|s| (*s).into())
             .collect(),
+            Backend::Zypper => [
+                "--",
+                "/usr/bin/zypper",
+                "install",
+                "--force",
+                "--no-allow-vendor-change",
+            ]
+            .iter()
+            .map(|s| (*s).into())
+            .collect(),
             Backend::Unsupported => unreachable!(),
         };
         args.extend(packages.into_iter().map(|package| {
@@ -244,6 +283,7 @@ pub fn os_release(text: &str) -> (String, Backend) {
         value("PRETTY_NAME").unwrap_or_else(|| id.clone()),
         match (id.as_str(), value("VERSION_ID").as_deref()) {
             ("arch" | "cachyos", _) => Backend::Pacman,
+            ("opensuse-tumbleweed", _) | ("opensuse-leap", Some("16.0")) => Backend::Zypper,
             ("debian", Some("12")) | ("ubuntu", Some("22.04")) => Backend::Apt { t64: false },
             ("debian", Some("13")) | ("ubuntu", Some("24.04")) => Backend::Apt { t64: true },
             ("fedora", Some("43" | "44"))
@@ -280,6 +320,15 @@ pub fn transaction(
         if !run(&refresh)? {
             return Err(
                 "Package lists could not be refreshed. Check the terminal output and retry.".into(),
+            );
+        }
+    }
+    if plan.backend == Backend::Zypper {
+        let refresh = ["--", "/usr/bin/zypper", "refresh"].map(String::from);
+        if !run(&refresh)? {
+            return Err(
+                "Repository metadata could not be refreshed. Check the terminal output and retry."
+                    .into(),
             );
         }
     }
@@ -357,7 +406,14 @@ pub fn probe(client: Client) -> Plan {
         add("Desktop keyring", "gnome-keyring");
     }
     if std::env::var_os("WAYLAND_DISPLAY").is_some() && !executable("Xwayland") {
-        add("XWayland", "xorg-xwayland");
+        add(
+            "XWayland",
+            if backend == Backend::Zypper {
+                "xwayland"
+            } else {
+                "xorg-xwayland"
+            },
+        );
     }
     match client {
         Client::OfficialOsrs => {
@@ -372,12 +428,8 @@ pub fn probe(client: Client) -> Plan {
                 ("libOpenGL.so.0", "OpenGL", "libglvnd"),
             ] {
                 if !library(file) {
-                    let package = if package == "libglvnd" {
-                        backend.graphics_package(file)
-                    } else {
-                        package
-                    };
-                    add(name, package);
+                    let package = backend.library_package(file, package);
+                    add(name, &package);
                 }
             }
         }
@@ -394,12 +446,8 @@ pub fn probe(client: Client) -> Plan {
                 ("libGL.so.1", "OpenGL", "libglvnd"),
             ] {
                 if !library(file) {
-                    let package = if package == "libglvnd" {
-                        backend.graphics_package(file)
-                    } else {
-                        package
-                    };
-                    add(name, package);
+                    let package = backend.library_package(file, package);
+                    add(name, &package);
                 }
             }
         }
@@ -411,7 +459,9 @@ pub fn probe(client: Client) -> Plan {
         supported: backend != Backend::Unsupported
             && std::env::consts::ARCH == "x86_64"
             && Path::new(backend.executable()).is_file()
-            && !(backend == Backend::Dnf && Path::new("/run/ostree-booted").exists()),
+            && !(backend == Backend::Dnf && Path::new("/run/ostree-booted").exists())
+            && !(backend == Backend::Zypper
+                && Path::new("/usr/sbin/transactional-update").is_file()),
         missing,
     }
 }
@@ -640,6 +690,52 @@ mod tests {
             plan.missing[0].package = invalid.into();
             assert!(plan.arguments().is_err());
         }
+    }
+    #[test]
+    fn opensuse_refresh_and_install_use_fixed_capabilities_and_consent() {
+        assert_eq!(os_release("ID=opensuse-tumbleweed").1, Backend::Zypper);
+        assert_eq!(
+            os_release("ID=opensuse-leap\nVERSION_ID=16.0").1,
+            Backend::Zypper
+        );
+        for id in ["opensuse-microos", "opensuse-aeon", "opensuse-kalpa"] {
+            assert_eq!(
+                os_release(&format!("ID={id}\nID_LIKE=opensuse")).1,
+                Backend::Unsupported
+            );
+        }
+        let mut plan = Plan {
+            client: Client::OfficialRs3,
+            system: "openSUSE".into(),
+            backend: Backend::Zypper,
+            supported: true,
+            missing: vec![Requirement {
+                name: "EGL".into(),
+                package: Backend::Zypper.library_package("libEGL.so.1", "libglvnd"),
+            }],
+        };
+        let args = plan.arguments().unwrap();
+        assert_eq!(
+            args,
+            [
+                "--",
+                "/usr/bin/zypper",
+                "install",
+                "--force",
+                "--no-allow-vendor-change",
+                "libEGL.so.1()(64bit)"
+            ]
+        );
+        let mut calls = Vec::new();
+        assert!(transaction(&plan, |args| {
+            calls.push(args.to_vec());
+            Ok(false)
+        })
+        .is_err());
+        assert_eq!(calls, vec![vec!["--", "/usr/bin/zypper", "refresh"]]);
+        assert!(transaction(&plan, |_| Ok(true)).is_ok());
+        plan.missing[0].package = "--non-interactive".into();
+        assert!(plan.arguments().is_err());
     }
     #[test]
     fn session_reports_replace_atomically_without_exposing_other_files() {

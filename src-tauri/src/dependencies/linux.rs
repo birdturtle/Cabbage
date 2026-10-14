@@ -86,7 +86,7 @@ pub fn install(
     let client = client(id);
     let plan = cabbage_dependency_helper::probe(client);
     if !plan.supported {
-        return Err("Automatic dependency setup supports Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04 and Fedora 43/44 on x64. Install the missing requirements with your package manager, then select Check again.".into());
+        return Err("Automatic dependency setup supports Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04 Fedora 43/44 and openSUSE Tumbleweed/Leap 16.0 on x64. Install the missing requirements with your package manager, then select Check again.".into());
     }
     if plan.missing.is_empty() {
         return Ok("Requirements are already installed.".into());
