@@ -216,7 +216,6 @@ impl Plan {
                 "--setopt=assumeyes=False",
                 "--setopt=assumeno=False",
                 "install",
-                "--",
             ]
             .iter()
             .map(|s| (*s).into())
@@ -623,7 +622,6 @@ mod tests {
                 "--setopt=assumeyes=False",
                 "--setopt=assumeno=False",
                 "install",
-                "--",
                 "wine.x86_64"
             ]
         );
