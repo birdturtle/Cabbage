@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "allow-launcher"
 description = "Local launcher commands; unavailable to remote authentication pages."
-commands.allow = ["installation_status", "install_launcher", "uninstall_launcher", "keep_portable", "launcher_status", "launch_client", "maintain_client", "select_client", "save_preferences", "begin_login", "cancel_login", "remove_account", "select_character", "load_accounts", "select_account", "check_updates", "install_update", "update_progress", "acknowledge_update"]
+commands.allow = ["installation_status", "install_launcher", "uninstall_launcher", "keep_portable", "launcher_status", "launch_client", "maintain_client", "select_client", "save_preferences", "begin_login", "cancel_login", "remove_account", "select_character", "load_accounts", "select_account", "check_updates", "recheck_requirements", "install_requirements", "install_update", "update_progress", "acknowledge_update"]

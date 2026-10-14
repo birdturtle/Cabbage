@@ -151,3 +151,5 @@ dialog .action-row { display:flex; justify-content:flex-end; gap:10px; margin-to
 #update-progress[hidden] { display: none; }
 #update-progress::-webkit-progress-bar { background: #333; }
 #update-progress::-webkit-progress-value { background: #f0a000; }
+
+.requirement-actions { display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; }

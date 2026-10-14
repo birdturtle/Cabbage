@@ -330,3 +330,36 @@ test('update errors remain visible and installation can be retried', async () =>
   await app.element('install-update').listeners.click();
   assert.equal(app.calls.filter(call=>call.command==='install_update').length,2);
 });
+
+
+test('Windows dependency setup requires confirmation and keeps the chosen client', async () => {
+  const app=launcher({checkUpdatesOnStartup:false},{status:{platform:'windows',selectedClient:'officialOsrs',clientAvailable:false,requirements:{required:true,busy:false,message:'Microsoft Visual C++ Runtime is required for this client.'}}});
+  await settle();
+  assert.equal(app.element('requirement-actions').hidden,false);
+  assert.equal(app.element('play').disabled,true);
+  app.element('install-requirements').listeners.click();
+  assert.equal(app.element('requirements-dialog').open,true);
+  assert.ok(!app.calls.some(call=>call.command==='install_requirements'));
+  app.element('cancel-requirements').listeners.click();
+  assert.ok(!app.calls.some(call=>call.command==='install_requirements'));
+  app.element('install-requirements').listeners.click();
+  app.status.selectedClient='runelite';
+  await app.element('confirm-requirements').listeners.click();
+  assert.equal(app.calls.find(call=>call.command==='install_requirements').args.client,'officialOsrs');
+  assert.equal(app.element('requirements-dialog').open,false);
+});
+
+test('dependency setup progress and retry stay in the launch area', async () => {
+  const app=launcher({checkUpdatesOnStartup:false},{status:{platform:'windows',selectedClient:'officialOsrs',requirements:{required:true,busy:true,message:'Verifying Microsoft installer…'}}});
+  await settle();
+  assert.equal(app.element('client-progress').hidden,false);
+  assert.equal(app.element('play-hint').textContent,'Verifying Microsoft installer…');
+  app.status.requirements={required:true,busy:false,message:'Installation cancelled. You can retry when ready.'};
+  await app.poll();
+  assert.equal(app.element('client-progress').hidden,true);
+  assert.equal(app.element('play-hint').textContent,app.status.requirements.message);
+  await app.element('recheck-requirements').listeners.click();
+  assert.ok(app.calls.some(call=>call.command==='recheck_requirements'));
+  const linux=launcher({checkUpdatesOnStartup:false}); await settle();
+  assert.equal(linux.element('requirement-actions').hidden,true);
+});

@@ -5,6 +5,7 @@ mod accounts;
 mod auth;
 mod clients;
 mod downloads;
+mod dependencies;
 mod graphics;
 mod maintenance;
 mod osrs;
@@ -27,12 +28,14 @@ struct AppState {
     account: Mutex<AccountState>,
     wallet: Mutex<()>,
     update: update_install::SharedProgress,
+    dependencies: dependencies::Shared,
     http: reqwest::Client,
     clients: Mutex<clients::Manager>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Status {
+    requirements: dependencies::Status,
     settings: Settings,
     accounts: Vec<AccountSummary>,
     selected_account: Option<String>,
@@ -97,6 +100,7 @@ async fn launcher_status(
     let settings = state.settings.lock().unwrap().clone();
     let account = state.account.lock().unwrap();
     let selected = settings.selected_client();
+    let requirements = dependencies::status(&state.dependencies, selected);
     let key = account
         .book
         .selected
@@ -110,6 +114,10 @@ async fn launcher_status(
     let mut descriptors = clients::registry();
     let root = client_root(&app)?;
     for descriptor in &mut descriptors {
+        if cfg!(windows) && descriptor.id == clients::ClientId::OfficialOsrs && !state.dependencies.lock().unwrap().vc_ready {
+            descriptor.available = false;
+            descriptor.unavailable_reason = Some("Requirements missing.");
+        }
         descriptor.files_present =
             maintenance::has_files(&root.join(descriptor.id.directory()), descriptor.id);
         descriptor.in_use = manager.client_in_use(descriptor.id);
@@ -121,11 +129,10 @@ async fn launcher_status(
     let progress = manager.progress(selected);
     let client = progress.lock().unwrap();
     Ok(Status {
+        client_available: !requirements.required && selected.unavailable_reason(std::env::consts::OS, std::env::consts::ARCH).is_none(),
+        requirements,
         clients: descriptors,
         selected_client: selected,
-        client_available: selected
-            .unavailable_reason(std::env::consts::OS, std::env::consts::ARCH)
-            .is_none(),
         client_running: running,
         client_busy: client.busy,
         client_in_use: manager.client_in_use(selected),
@@ -319,6 +326,9 @@ async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<S
     local(&window)?;
     let state = app.state::<AppState>();
     let selected = state.settings.lock().unwrap().selected_client();
+    if state.dependencies.lock().unwrap().busy { return Err("Wait for dependency setup to finish.".into()); }
+    #[cfg(windows)]
+    if selected == clients::ClientId::OfficialOsrs && !dependencies::windows::vc_ready() { return Err("Install Microsoft Visual C++ Runtime to use this client.".into()); }
     let (key, name) = {
         let account = state.account.lock().unwrap();
         let session = account.book.current().ok_or("Add an account to play.")?;
@@ -771,6 +781,7 @@ fn update_progress(window: WebviewWindow, app: tauri::AppHandle) -> Result<updat
     Ok(app.state::<AppState>().update.lock().unwrap().clone())
 }
 fn update_idle(state: &AppState) -> Result<(), String> {
+    if state.dependencies.lock().unwrap().busy { return Err("Wait for dependency setup to finish before updating Cabbage.".into()); }
     let _wallet = state.wallet.try_lock().map_err(|_| "Wait for account changes to finish, then retry.")?;
     if state.account.lock().unwrap().attempt.is_some() { return Err("Finish signing in before updating Cabbage.".into()); }
     let mut clients = state.clients.lock().unwrap();
@@ -813,6 +824,48 @@ async fn install_update(window: WebviewWindow, app: tauri::AppHandle) -> Result<
     result
 }
 
+#[tauri::command]
+fn recheck_requirements(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    local(&window)?;
+    let state = app.state::<AppState>();
+    let mut dependencies = state.dependencies.lock().unwrap();
+    if dependencies.busy { return Err("Finish dependency setup before checking again.".into()); }
+    #[cfg(windows)] { dependencies.vc_ready = dependencies::windows::vc_ready(); }
+    dependencies.message.clear();
+    Ok(())
+}
+#[tauri::command]
+async fn install_requirements(window: WebviewWindow, app: tauri::AppHandle, client: clients::ClientId) -> Result<String, String> {
+    local(&window)?;
+    #[cfg(not(windows))] { let _ = (app, client); return Err("Dependency installation for Linux is not available yet.".into()); }
+    #[cfg(windows)] {
+        if client != clients::ClientId::OfficialOsrs || std::env::consts::ARCH != "x86_64" { return Err("No Windows dependency installer is available for this client.".into()); }
+        let state = app.state::<AppState>();
+        update_idle(&state)?;
+        {
+            let mut dependencies = state.dependencies.lock().unwrap();
+            if dependencies.busy { return Err("Dependency setup is already running.".into()); }
+            if dependencies::windows::vc_ready() { dependencies.vc_ready=true; dependencies.message.clear(); return Ok("Requirements are already installed.".into()); }
+            dependencies.busy=true; dependencies.message="Preparing requirements…".into();
+        }
+        let handle=app.clone();
+        let result=tauri::async_runtime::spawn_blocking(move || {
+            let root=handle.path().app_local_data_dir().map_err(|_| "Cannot locate dependency download folder.")?.join("dependency-setup");
+            dependencies::windows::install(dependencies::Installer::VisualCpp,&root,|message| handle.state::<AppState>().dependencies.lock().unwrap().message=message.into())
+        }).await.map_err(|_| "Dependency setup failed.".to_string()).and_then(|result|result);
+        let mut dependencies=state.dependencies.lock().unwrap();
+        dependencies.busy=false; dependencies.vc_ready=dependencies::windows::vc_ready();
+        dependencies.message=match &result {
+            Ok(true)=>"Restart Windows to finish installing requirements.".into(),
+            Ok(false) if dependencies.vc_ready=>"Requirements installed. Ready to play.".into(),
+            Ok(false)=>"Setup finished, but requirements are still missing. Select Check again or retry installation.".into(),
+            Err(error)=>error.clone(),
+        };
+        result?;
+        Ok(dependencies.message.clone())
+    }
+}
+
 fn installation_layout(app: &tauri::AppHandle) -> Result<installation::Layout, String> {
     #[cfg(windows)] {
         Ok(installation::Layout::windows(
@@ -852,6 +905,8 @@ fn keep_portable(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), Str
 }
 
 fn main() {
+    #[cfg(windows)]
+    if !dependencies::windows::startup() { return; }
     // GTK's Wayland window ID derives from the program name, even when the
     // GtkApplication has its own ID. Match the installed desktop entry.
     #[cfg(target_os = "linux")]
@@ -905,6 +960,7 @@ fn main() {
                 account: Mutex::new(AccountState::default()),
                 wallet: Mutex::new(()),
                 update: Default::default(),
+                dependencies: dependencies::initial(),
                 clients: Mutex::new(clients::Manager::default()),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
@@ -944,6 +1000,8 @@ fn main() {
             remove_account,
             select_character,
             check_updates,
+            recheck_requirements,
+            install_requirements,
             install_update,
             update_progress,
             acknowledge_update

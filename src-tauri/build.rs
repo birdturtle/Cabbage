@@ -51,6 +51,8 @@ fn main() {
             "load_accounts",
             "select_account",
             "check_updates",
+            "recheck_requirements",
+            "install_requirements",
             "install_update",
             "update_progress",
             "acknowledge_update",

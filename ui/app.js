@@ -6,6 +6,7 @@ let checkingUpdates = false;
 let updateFeedback = false;
 let toastTimer;
 let pendingUninstall;
+let requirementClient;
 let menuClient;
 let selectingClient = false;
 let selectionRevision = 0;
@@ -66,8 +67,8 @@ function render() {
   if ($('play').disabled !== playDisabled) $('play').disabled = playDisabled;
   setText('play', status.clientBusy ? 'Please wait…' : 'Play');
   const activity = status.clients.find(client => client.id === status.selectedClient && client.busy) || status.clients.find(client => client.busy);
-  const preparing = Boolean(status.clientBusy || activity);
-  const progressMessage = activity?.message || status.clientMessage || '';
+  const preparing = Boolean(status.clientBusy || activity || status.requirements?.busy);
+  const progressMessage = status.requirements?.busy ? status.requirements.message : activity?.message || status.clientMessage || '';
   const percentMatch = progressMessage.match(/(\d+(?:\.\d+)?)%/);
   const progress = $('client-progress');
   progress.hidden = !preparing;
@@ -81,7 +82,9 @@ function render() {
     $('client-progress-fill').style.width = '';
     progress.removeAttribute('aria-valuenow');
   }
-  setText('play-hint', status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.'));
+  $('requirement-actions').hidden = !(status.requirements?.required || status.platform === 'windows' && status.selectedClient === 'officialOsrs' && status.requirements?.message);
+  $('install-requirements').hidden = !status.requirements?.required;
+  setText('play-hint', status.requirements?.message || status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.'));
   setText('client-version', status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName);
   for (const client of status.clients) {
     const card = $(`client-${client.id}`); if (!card) continue;
@@ -165,6 +168,19 @@ async function refresh() {
 }
 
 document.querySelectorAll('[data-page], [data-go]').forEach((button) => button.addEventListener('click', () => page(button.dataset.page || button.dataset.go)));
+$('install-requirements').addEventListener('click', () => {
+  if (busy || !status?.requirements?.required) return;
+  requirementClient = status.selectedClient;
+  $('requirements-dialog').showModal();
+});
+$('cancel-requirements').addEventListener('click', () => { requirementClient=undefined; $('requirements-dialog').close(); });
+$('requirements-dialog').addEventListener('cancel', () => { requirementClient=undefined; });
+$('confirm-requirements').addEventListener('click', () => {
+  if (busy || !requirementClient) return;
+  const client=requirementClient; requirementClient=undefined; $('requirements-dialog').close();
+  return action('install_requirements', {client});
+});
+$('recheck-requirements').addEventListener('click', () => action('recheck_requirements'));
 $('play').addEventListener('click', () => { if (!busy && !selectingClient && status?.clientAvailable && !status?.clientBusy && !status?.clientRunning && !status?.needsSignIn && status?.characters.some(item => item.accountId === status.selectedCharacter)) return action('launch_client'); });
 function selectClient(client) {
   if (busy || !invoke || !client || (status.selectedClient === client.id && !selectingClient)) return;
