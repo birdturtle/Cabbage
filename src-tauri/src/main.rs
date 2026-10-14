@@ -118,6 +118,10 @@ async fn launcher_status(
             descriptor.available = false;
             descriptor.unavailable_reason = Some("Requirements missing.");
         }
+        #[cfg(target_os="linux")]
+        if state.dependencies.lock().unwrap().plans.iter().any(|plan| plan.client==dependencies::linux::client(descriptor.id) && plan.supported && !plan.missing.is_empty()) {
+            descriptor.available=false; descriptor.unavailable_reason=Some("Requirements missing.");
+        }
         descriptor.files_present =
             maintenance::has_files(&root.join(descriptor.id.directory()), descriptor.id);
         descriptor.in_use = manager.client_in_use(descriptor.id);
@@ -329,6 +333,8 @@ async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<S
     if state.dependencies.lock().unwrap().busy { return Err("Wait for dependency setup to finish.".into()); }
     #[cfg(windows)]
     if selected == clients::ClientId::OfficialOsrs && !dependencies::windows::vc_ready() { return Err("Install Microsoft Visual C++ Runtime to use this client.".into()); }
+    #[cfg(target_os="linux")]
+    { let plan=cabbage_dependency_helper::probe(dependencies::linux::client(selected)); if plan.supported && !plan.missing.is_empty() { return Err("Install the missing requirements before playing. Select Check again after setup.".into()); } }
     let (key, name) = {
         let account = state.account.lock().unwrap();
         let session = account.book.current().ok_or("Add an account to play.")?;
@@ -831,13 +837,31 @@ fn recheck_requirements(window: WebviewWindow, app: tauri::AppHandle) -> Result<
     let mut dependencies = state.dependencies.lock().unwrap();
     if dependencies.busy { return Err("Finish dependency setup before checking again.".into()); }
     #[cfg(windows)] { dependencies.vc_ready = dependencies::windows::vc_ready(); }
+    #[cfg(target_os="linux")] { dependencies.plans=dependencies::linux::probe(); }
     dependencies.message.clear();
     Ok(())
 }
 #[tauri::command]
 async fn install_requirements(window: WebviewWindow, app: tauri::AppHandle, client: clients::ClientId) -> Result<String, String> {
     local(&window)?;
-    #[cfg(not(windows))] { let _ = (app, client); return Err("Dependency installation for Linux is not available yet.".into()); }
+    #[cfg(not(any(windows,target_os="linux")))] { let _ = (app, client); return Err("Dependency setup is not supported on this platform.".into()); }
+    #[cfg(target_os="linux")] {
+        let state=app.state::<AppState>(); update_idle(&state)?;
+        {
+            let mut dependencies=state.dependencies.lock().unwrap();
+            if dependencies.busy { return Err("Dependency setup is already running.".into()); }
+            dependencies.busy=true; dependencies.message="Opening terminal setup…".into(); dependencies.message_client=Some(client);
+        }
+        let handle=app.clone();
+        let result=tauri::async_runtime::spawn_blocking(move || {
+            let root=handle.path().app_data_dir().map_err(|_|"Cannot locate setup folder.")?.join("dependency-setup");
+            dependencies::linux::install(client,&root,&handle.state::<AppState>().dependencies)
+        }).await.map_err(|_|"Dependency setup failed.".to_string()).and_then(|result|result);
+        let mut dependencies=state.dependencies.lock().unwrap();
+        dependencies.busy=false; dependencies.plans=dependencies::linux::probe();
+        dependencies.message=match &result {Ok(message)=>message.clone(),Err(error)=>error.clone()};
+        result
+    }
     #[cfg(windows)] {
         if client != clients::ClientId::OfficialOsrs || std::env::consts::ARCH != "x86_64" { return Err("No Windows dependency installer is available for this client.".into()); }
         let state = app.state::<AppState>();
@@ -846,7 +870,7 @@ async fn install_requirements(window: WebviewWindow, app: tauri::AppHandle, clie
             let mut dependencies = state.dependencies.lock().unwrap();
             if dependencies.busy { return Err("Dependency setup is already running.".into()); }
             if dependencies::windows::vc_ready() { dependencies.vc_ready=true; dependencies.message.clear(); return Ok("Requirements are already installed.".into()); }
-            dependencies.busy=true; dependencies.message="Preparing requirements…".into();
+            dependencies.busy=true; dependencies.message="Preparing requirements…".into(); dependencies.message_client=Some(client);
         }
         let handle=app.clone();
         let result=tauri::async_runtime::spawn_blocking(move || {

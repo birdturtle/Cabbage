@@ -1,41 +1,93 @@
-//! Client requirements and consent-driven setup. Linux installers are a later phase.
+//! Client requirements and consent-driven Windows and Linux setup.
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
+#[cfg(target_os = "linux")]
+pub mod linux;
 #[cfg(windows)]
 pub mod windows;
+#[cfg(not(target_os = "linux"))]
 const VC_MESSAGE: &str = "Microsoft Visual C++ Runtime is required for this client.";
 #[derive(Default)]
 pub struct State {
     pub busy: bool,
     pub message: String,
     pub vc_ready: bool,
+    pub message_client: Option<crate::clients::ClientId>,
+    #[cfg(target_os = "linux")]
+    pub plans: Vec<cabbage_dependency_helper::Plan>,
 }
 pub type Shared = Arc<Mutex<State>>;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     pub required: bool,
+    pub can_install: bool,
     pub busy: bool,
     pub message: String,
 }
 pub fn status(state: &Shared, client: crate::clients::ClientId) -> Status {
     let state = state.lock().unwrap();
-    let required =
-        cfg!(windows) && client == crate::clients::ClientId::OfficialOsrs && !state.vc_ready;
+    #[cfg(target_os = "linux")]
+    let plan = state
+        .plans
+        .iter()
+        .find(|p| p.client == linux::client(client));
+    let required = {
+        #[cfg(target_os = "linux")]
+        {
+            plan.is_some_and(|p| p.supported && !p.missing.is_empty())
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            cfg!(windows) && client == crate::clients::ClientId::OfficialOsrs && !state.vc_ready
+        }
+    };
+    let can_install = {
+        #[cfg(target_os = "linux")]
+        {
+            plan.is_some_and(|p| p.supported)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            cfg!(windows) && std::env::consts::ARCH == "x86_64"
+        }
+    };
+    let message = if state.busy || state.message_client == Some(client) && !state.message.is_empty()
+    {
+        state.message.clone()
+    } else if required {
+        #[cfg(target_os = "linux")]
+        {
+            format!(
+                "Missing requirements: {}.{}",
+                plan.unwrap()
+                    .missing
+                    .iter()
+                    .map(|r| r.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                if can_install {
+                    ""
+                } else {
+                    " Install them with your package manager, then select Check again."
+                }
+            )
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            VC_MESSAGE.into()
+        }
+    } else {
+        String::new()
+    };
     Status {
         required,
+        can_install,
         busy: state.busy,
-        message: if state.busy
-            || client == crate::clients::ClientId::OfficialOsrs && !state.message.is_empty()
-        {
-            state.message.clone()
-        } else if required {
-            VC_MESSAGE.into()
-        } else {
-            String::new()
-        },
+        message,
     }
 }
+
 pub fn initial() -> Shared {
     let state = State {
         vc_ready: {
@@ -48,6 +100,8 @@ pub fn initial() -> Shared {
                 true
             }
         },
+        #[cfg(target_os = "linux")]
+        plans: linux::probe(),
         ..Default::default()
     };
     Arc::new(Mutex::new(state))

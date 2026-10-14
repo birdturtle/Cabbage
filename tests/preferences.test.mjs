@@ -363,3 +363,14 @@ test('dependency setup progress and retry stay in the launch area', async () => 
   const linux=launcher({checkUpdatesOnStartup:false}); await settle();
   assert.equal(linux.element('requirement-actions').hidden,true);
 });
+
+
+test('Linux dependency installation opens terminal setup without the Windows dialog', async () => {
+  const app=launcher({checkUpdatesOnStartup:false},{status:{platform:'linux',selectedClient:'officialOsrs',requirements:{required:true,canInstall:true,busy:false,message:'Missing requirements: Wine.'}}});
+  await settle(); await app.element('install-requirements').listeners.click();
+  assert.equal(app.calls.find(call=>call.command==='install_requirements').args.client,'officialOsrs');
+  assert.ok(!app.element('requirements-dialog').open);
+  app.status.requirements.canInstall=false;await app.poll();
+  assert.equal(app.element('install-requirements').hidden,true);
+  assert.equal(app.element('requirement-actions').hidden,false);
+});

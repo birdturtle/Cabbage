@@ -27,6 +27,8 @@ jobs:
         run: npm ci
       - name: Check frontend and isolation
         run: npm run check
+      - name: Test dependency helper
+        run: cargo test --locked --manifest-path dependency-helper/Cargo.toml
       - name: Test game host
         run: cargo test --locked --manifest-path game-host/Cargo.toml
       - name: Test backend

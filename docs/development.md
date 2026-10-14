@@ -5,6 +5,7 @@ Tauri development requires Node.js and Rust. Linux builds need WebKitGTK 4.1, GT
 ```sh
 npm ci
 npm run check
+cargo test --locked --manifest-path dependency-helper/Cargo.toml
 cargo test --locked --manifest-path game-host/Cargo.toml
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 npm run dev

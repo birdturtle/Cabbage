@@ -19,6 +19,7 @@ jobs:
         run: rustup update stable
       - run: npm ci
       - run: npm run check
+      - run: cargo test --locked --manifest-path dependency-helper/Cargo.toml
       - run: cargo test --locked --manifest-path game-host/Cargo.toml
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - name: Build standalone executable

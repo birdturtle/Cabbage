@@ -82,8 +82,8 @@ function render() {
     $('client-progress-fill').style.width = '';
     progress.removeAttribute('aria-valuenow');
   }
-  $('requirement-actions').hidden = !(status.requirements?.required || status.platform === 'windows' && status.selectedClient === 'officialOsrs' && status.requirements?.message);
-  $('install-requirements').hidden = !status.requirements?.required;
+  $('requirement-actions').hidden = !(status.requirements?.required || status.requirements?.message);
+  $('install-requirements').hidden = !status.requirements?.required || status.requirements.canInstall === false;
   setText('play-hint', status.requirements?.message || status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.'));
   setText('client-version', status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName);
   for (const client of status.clients) {
@@ -170,6 +170,7 @@ async function refresh() {
 document.querySelectorAll('[data-page], [data-go]').forEach((button) => button.addEventListener('click', () => page(button.dataset.page || button.dataset.go)));
 $('install-requirements').addEventListener('click', () => {
   if (busy || !status?.requirements?.required) return;
+  if (status.platform === 'linux') return action('install_requirements', {client:status.selectedClient});
   requirementClient = status.selectedClient;
   $('requirements-dialog').showModal();
 });

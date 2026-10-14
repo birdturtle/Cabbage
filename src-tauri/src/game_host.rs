@@ -7,18 +7,24 @@ use std::{
 const BYTES: &[u8] = include_bytes!(env!("CABBAGE_GAME_HOST"));
 
 pub fn install(root: &Path) -> Result<PathBuf, String> {
-    let digest = format!("{:x}", Sha256::digest(BYTES));
+    install_named(
+        root,
+        BYTES,
+        if cfg!(windows) {
+            "cabbage-game-host.exe"
+        } else {
+            "cabbage-game-host"
+        },
+    )
+}
+pub fn install_named(root: &Path, bytes: &[u8], name: &str) -> Result<PathBuf, String> {
+    let digest = format!("{:x}", Sha256::digest(bytes));
     let folder = root.join("support").join(&digest);
     fs::create_dir_all(&folder).map_err(|_| "Cannot create game helper directory.")?;
-    let name = if cfg!(windows) {
-        "cabbage-game-host.exe"
-    } else {
-        "cabbage-game-host"
-    };
     let path = folder.join(name);
     if path.exists() {
         if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_file())
-            && fs::read(&path).is_ok_and(|bytes| bytes == BYTES)
+            && fs::read(&path).is_ok_and(|installed| installed == bytes)
         {
             return Ok(path);
         }
@@ -36,14 +42,14 @@ pub fn install(root: &Path) -> Result<PathBuf, String> {
         let mut file = options
             .open(&staged)
             .map_err(|_| "Cannot save game helper.")?;
-        file.write_all(BYTES)
+        file.write_all(bytes)
             .and_then(|_| file.sync_all())
             .map_err(|_| "Cannot save game helper.")?;
         drop(file);
         // A hard link publishes without replacing an existing, possibly active helper.
         match fs::hard_link(&staged, &path) {
             Ok(()) => Ok(path.clone()),
-            Err(_) if fs::read(&path).is_ok_and(|bytes| bytes == BYTES) => Ok(path.clone()),
+            Err(_) if fs::read(&path).is_ok_and(|installed| installed == bytes) => Ok(path.clone()),
             Err(_) => Err("Cannot install game helper.".into()),
         }
     })();

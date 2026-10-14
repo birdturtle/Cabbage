@@ -30,6 +30,7 @@ tar = "0.4"
 zip = { version = "4", default-features = false, features = ["deflate"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+cabbage-dependency-helper = { path = "../dependency-helper" }
 libc = "0.2"
 gtk = "0.18"
 webkit2gtk = "2.0"

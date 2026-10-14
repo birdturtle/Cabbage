@@ -9,7 +9,7 @@ tag = sys.argv[1]
 if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?', tag):
     raise SystemExit('Invalid release tag')
 version = tag[1:]
-for name in ['src-tauri/Cargo.toml', 'game-host/Cargo.toml']:
+for name in ['src-tauri/Cargo.toml', 'game-host/Cargo.toml', 'dependency-helper/Cargo.toml']:
     match = re.search(r'^version\s*=\s*"([^"]+)"', (root / name).read_text(), re.M)
     if not match or match[1] != version:
         raise SystemExit(f'{name} does not match {tag}')

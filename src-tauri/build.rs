@@ -27,11 +27,42 @@ fn main() {
     println!(
         "cargo:rustc-env=CABBAGE_GAME_HOST={}",
         output
-            .join(target)
+            .join(&target)
             .join("release")
             .join(executable)
             .display()
     );
+
+    if target.contains("linux") {
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../dependency-helper/Cargo.toml");
+        let output = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap())
+            .join("dependency-helper");
+        for path in [
+            "../dependency-helper/src",
+            "../dependency-helper/Cargo.toml",
+            "../dependency-helper/Cargo.lock",
+        ] {
+            println!("cargo:rerun-if-changed={path}");
+        }
+        let status = std::process::Command::new(std::env::var_os("CARGO").unwrap())
+            .args(["build", "--locked", "--release", "--manifest-path"])
+            .arg(manifest)
+            .arg("--target")
+            .arg(&target)
+            .arg("--target-dir")
+            .arg(&output)
+            .status()
+            .expect("Cannot build dependency helper");
+        assert!(status.success(), "Cannot build dependency helper");
+        println!(
+            "cargo:rustc-env=CABBAGE_DEPENDENCY_HELPER={}",
+            output
+                .join(&target)
+                .join("release/cabbage-dependency-helper")
+                .display()
+        );
+    }
 
     let attributes = tauri_build::Attributes::new()
         .app_manifest(tauri_build::AppManifest::new().commands(&[
