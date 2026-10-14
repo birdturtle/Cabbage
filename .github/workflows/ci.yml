@@ -33,3 +33,25 @@ jobs:
         run: cargo test --locked --manifest-path game-host/Cargo.toml
       - name: Test backend
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+  apt-packages:
+    name: Dependency packages (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: debian:12
+            alsa: libasound2
+          - image: debian:13
+            alsa: libasound2t64
+          - image: ubuntu:22.04
+            alsa: libasound2
+          - image: ubuntu:24.04
+            alsa: libasound2t64
+    container: ${{ matrix.image }}
+    steps:
+      - name: Verify dependency transaction without installing packages
+        run: |
+          apt-get update --error-on=any
+          apt-get --simulate install --no-remove --reinstall -- wine libsdl2-2.0-0 libegl1 libopengl0 libgl1 xwayland gnome-keyring libx11-6 libxext6 libxi6 libxrender1 libxtst6 libfreetype6 libfontconfig1 ${{ matrix.alsa }}

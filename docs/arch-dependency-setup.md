@@ -29,7 +29,7 @@ Completion, cancellation and failures return through a private, per-session JSON
 
 Local probes found no missing requirements for the three clients on the development CachyOS machine. Tests cover explicit distro support, package allowlisting, duplicate packages, system-update arguments, terminal review and Linux GUI routing. Launcher regression tests passed. PTY checks exercised Cancel and Install in preview mode without installing anything.
 
-A real missing-package install and sudo cancellation still need interactive acceptance on an expendable Arch/CachyOS system. No host packages have been changed during development.
+Windows and Linux CI passed for commit `ae90c80`. The user reported successful dependency setup in a CachyOS VM. The initial live-session attempt could not finish; the subsequent test worked. Sudo cancellation was not separately reported. No host packages were changed during development.
 
 For visual testing without package installation:
 

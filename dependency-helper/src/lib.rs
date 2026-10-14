@@ -29,10 +29,53 @@ pub struct Requirement {
     pub name: String,
     pub package: String,
 }
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Backend {
+    Pacman,
+    Apt { t64: bool },
+    Unsupported,
+}
+impl Backend {
+    pub fn executable(self) -> &'static str {
+        match self {
+            Self::Pacman => "/usr/bin/pacman",
+            Self::Apt { .. } => "/usr/bin/apt-get",
+            Self::Unsupported => "",
+        }
+    }
+    pub fn notice(self) -> &'static str {
+        match self {
+            Self::Pacman => "This also updates installed system packages.\nPacman will show the full transaction before you approve it.",
+            _ => "Package lists will be refreshed before installation.\nAPT will show the full transaction before you approve it.",
+        }
+    }
+    fn package(self, arch: &str) -> &str {
+        if let Self::Apt { t64 } = self {
+            match arch {
+                "xorg-xwayland" => "xwayland",
+                "sdl2-compat" => "libsdl2-2.0-0",
+                "libx11" => "libx11-6",
+                "libxext" => "libxext6",
+                "libxi" => "libxi6",
+                "libxrender" => "libxrender1",
+                "libxtst" => "libxtst6",
+                "freetype2" => "libfreetype6",
+                "fontconfig" => "libfontconfig1",
+                "alsa-lib" if t64 => "libasound2t64",
+                "alsa-lib" => "libasound2",
+                _ => arch,
+            }
+        } else {
+            arch
+        }
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Plan {
     pub client: Client,
     pub system: String,
+    pub backend: Backend,
     pub supported: bool,
     pub missing: Vec<Requirement>,
 }
@@ -50,37 +93,71 @@ impl Plan {
             return Err("There is no supported installation to run.".into());
         }
         let packages = self.packages();
-        if packages.iter().any(|p| {
-            !matches!(
-                p.as_str(),
-                "wine"
-                    | "sdl2-compat"
-                    | "libglvnd"
-                    | "xorg-xwayland"
-                    | "gnome-keyring"
-                    | "libx11"
-                    | "libxext"
-                    | "libxi"
-                    | "libxrender"
-                    | "libxtst"
-                    | "freetype2"
-                    | "fontconfig"
-                    | "alsa-lib"
-            )
-        }) {
+        let allowed: &[&str] = match self.backend {
+            Backend::Pacman => &[
+                "wine",
+                "sdl2-compat",
+                "libglvnd",
+                "xorg-xwayland",
+                "gnome-keyring",
+                "libx11",
+                "libxext",
+                "libxi",
+                "libxrender",
+                "libxtst",
+                "freetype2",
+                "fontconfig",
+                "alsa-lib",
+            ],
+            Backend::Apt { t64 } => &[
+                "wine",
+                "libsdl2-2.0-0",
+                "libegl1",
+                "libopengl0",
+                "libgl1",
+                "xwayland",
+                "gnome-keyring",
+                "libx11-6",
+                "libxext6",
+                "libxi6",
+                "libxrender1",
+                "libxtst6",
+                "libfreetype6",
+                "libfontconfig1",
+                if t64 { "libasound2t64" } else { "libasound2" },
+            ],
+            Backend::Unsupported => return Err("Unsupported package manager.".into()),
+        };
+        if packages.iter().any(|p| !allowed.contains(&p.as_str())) {
             return Err("Unsupported dependency package.".into());
         }
-        let mut args = vec![
-            "--".into(),
-            "/usr/bin/pacman".into(),
-            "-Syu".into(),
-            "--".into(),
-        ];
+        let mut args: Vec<String> = match self.backend {
+            Backend::Pacman => ["--", "/usr/bin/pacman", "-Syu", "--"]
+                .iter()
+                .map(|s| (*s).into())
+                .collect(),
+            Backend::Apt { .. } => [
+                "--",
+                "/usr/bin/apt-get",
+                "install",
+                "--no-remove",
+                "--reinstall",
+                "-o",
+                "APT::Get::Assume-Yes=false",
+                "-o",
+                "APT::Get::Assume-No=false",
+                "--",
+            ]
+            .iter()
+            .map(|s| (*s).into())
+            .collect(),
+            Backend::Unsupported => unreachable!(),
+        };
         args.extend(packages);
         Ok(args)
     }
 }
-pub fn os_release(text: &str) -> (String, bool) {
+pub fn os_release(text: &str) -> (String, Backend) {
     let value = |key: &str| {
         text.lines().find_map(|line| {
             line.strip_prefix(&format!("{key}="))
@@ -90,9 +167,38 @@ pub fn os_release(text: &str) -> (String, bool) {
     let id = value("ID").unwrap_or_default();
     (
         value("PRETTY_NAME").unwrap_or_else(|| id.clone()),
-        matches!(id.as_str(), "arch" | "cachyos"),
+        match (id.as_str(), value("VERSION_ID").as_deref()) {
+            ("arch" | "cachyos", _) => Backend::Pacman,
+            ("debian", Some("12")) | ("ubuntu", Some("22.04")) => Backend::Apt { t64: false },
+            ("debian", Some("13")) | ("ubuntu", Some("24.04")) => Backend::Apt { t64: true },
+            _ => Backend::Unsupported,
+        },
     )
 }
+/// Runs the approved transaction; failures stop subsequent commands.
+/// The runner receives sudo arguments, never shell text.
+pub fn transaction(
+    plan: &Plan,
+    mut run: impl FnMut(&[String]) -> Result<bool, String>,
+) -> Result<(), String> {
+    let install = plan.arguments()?;
+    if matches!(plan.backend, Backend::Apt { .. }) {
+        let refresh = ["--", "/usr/bin/apt-get", "update", "--error-on=any"].map(String::from);
+        if !run(&refresh)? {
+            return Err(
+                "Package lists could not be refreshed. Check the terminal output and retry.".into(),
+            );
+        }
+    }
+    if !run(&install)? {
+        return Err(
+            "Package installation did not finish. Check the terminal output and retry when ready."
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "linux")]
 fn executable(name: &str) -> bool {
     use std::os::unix::fs::PermissionsExt;
@@ -146,13 +252,12 @@ fn keyring_provider() -> bool {
 }
 #[cfg(target_os = "linux")]
 pub fn probe(client: Client) -> Plan {
-    let (system, supported) =
-        os_release(&fs::read_to_string("/etc/os-release").unwrap_or_default());
+    let (system, backend) = os_release(&fs::read_to_string("/etc/os-release").unwrap_or_default());
     let mut missing = Vec::new();
     let mut add = |name: &str, package: &str| {
         missing.push(Requirement {
             name: name.into(),
-            package: package.into(),
+            package: backend.package(package).into(),
         })
     };
     if !keyring_provider() {
@@ -174,6 +279,16 @@ pub fn probe(client: Client) -> Plan {
                 ("libOpenGL.so.0", "OpenGL", "libglvnd"),
             ] {
                 if !library(file) {
+                    let package = if matches!(backend, Backend::Apt { .. }) && package == "libglvnd"
+                    {
+                        match file {
+                            "libEGL.so.1" => "libegl1",
+                            "libOpenGL.so.0" => "libopengl0",
+                            _ => "libgl1",
+                        }
+                    } else {
+                        package
+                    };
                     add(name, package);
                 }
             }
@@ -191,6 +306,16 @@ pub fn probe(client: Client) -> Plan {
                 ("libGL.so.1", "OpenGL", "libglvnd"),
             ] {
                 if !library(file) {
+                    let package = if matches!(backend, Backend::Apt { .. }) && package == "libglvnd"
+                    {
+                        match file {
+                            "libEGL.so.1" => "libegl1",
+                            "libOpenGL.so.0" => "libopengl0",
+                            _ => "libgl1",
+                        }
+                    } else {
+                        package
+                    };
                     add(name, package);
                 }
             }
@@ -199,9 +324,10 @@ pub fn probe(client: Client) -> Plan {
     Plan {
         client,
         system,
-        supported: supported
+        backend,
+        supported: backend != Backend::Unsupported
             && std::env::consts::ARCH == "x86_64"
-            && Path::new("/usr/bin/pacman").is_file(),
+            && Path::new(backend.executable()).is_file(),
         missing,
     }
 }
@@ -259,6 +385,7 @@ mod tests {
         let mut plan = Plan {
             client: Client::OfficialRs3,
             system: "CachyOS".into(),
+            backend: Backend::Pacman,
             supported: true,
             missing: vec![
                 Requirement {
@@ -279,6 +406,82 @@ mod tests {
         assert!(plan.arguments().is_err());
         plan.supported = false;
         assert!(plan.arguments().is_err());
+    }
+    #[test]
+    fn apt_plans_match_release_packages_and_keep_interactive_consent() {
+        for (release, t64) in [
+            ("ID=debian\nVERSION_ID=12", false),
+            ("ID=debian\nVERSION_ID=13", true),
+            ("ID=ubuntu\nVERSION_ID=22.04", false),
+            ("ID=ubuntu\nVERSION_ID=24.04", true),
+        ] {
+            let backend = os_release(release).1;
+            assert_eq!(backend, Backend::Apt { t64 });
+            let mut plan = Plan {
+                client: Client::Runelite,
+                system: "Test".into(),
+                backend,
+                supported: true,
+                missing: vec![Requirement {
+                    name: "ALSA".into(),
+                    package: backend.package("alsa-lib").into(),
+                }],
+            };
+            let args = plan.arguments().unwrap();
+            assert_eq!(
+                args.last().unwrap(),
+                if t64 { "libasound2t64" } else { "libasound2" }
+            );
+            assert!(args.contains(&"--no-remove".into()));
+            assert!(!args
+                .iter()
+                .any(|s| matches!(s.as_str(), "-y" | "upgrade" | "dist-upgrade")));
+            for invalid in ["wine-", "--assume-yes", "libglvnd", "libasound2*"] {
+                plan.missing[0].package = invalid.into();
+                assert!(plan.arguments().is_err());
+            }
+        }
+        assert_eq!(
+            os_release("ID=linuxmint\nID_LIKE=ubuntu\nVERSION_ID=22").1,
+            Backend::Unsupported
+        );
+        assert_eq!(
+            os_release("ID=ubuntu\nVERSION_ID=20.04").1,
+            Backend::Unsupported
+        );
+    }
+    #[test]
+    fn apt_refresh_failure_prevents_install_and_cancel_is_a_failure() {
+        let plan = Plan {
+            client: Client::OfficialOsrs,
+            system: "Debian".into(),
+            backend: Backend::Apt { t64: true },
+            supported: true,
+            missing: vec![Requirement {
+                name: "Wine".into(),
+                package: "wine".into(),
+            }],
+        };
+        let mut calls = Vec::new();
+        assert!(transaction(&plan, |args| {
+            calls.push(args.to_vec());
+            Ok(false)
+        })
+        .is_err());
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0],
+            ["--", "/usr/bin/apt-get", "update", "--error-on=any"]
+        );
+        calls.clear();
+        assert!(transaction(&plan, |args| {
+            calls.push(args.to_vec());
+            Ok(calls.len() == 1)
+        })
+        .is_err());
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[1][2], "install");
+        assert!(transaction(&plan, |_| Ok(true)).is_ok());
     }
     #[test]
     fn session_reports_replace_atomically_without_exposing_other_files() {
@@ -309,9 +512,18 @@ mod tests {
     }
     #[test]
     fn distro_support_is_explicit() {
-        assert!(os_release("ID=cachyos\nPRETTY_NAME=\"CachyOS\"").1);
-        assert!(os_release("ID=arch").1);
-        assert!(!os_release("ID=fedora\nID_LIKE=arch").1);
-        assert!(!os_release("ID=manjaro\nID_LIKE=arch").1);
+        assert_eq!(
+            os_release("ID=cachyos\nPRETTY_NAME=\"CachyOS\"").1,
+            Backend::Pacman
+        );
+        assert_eq!(os_release("ID=arch").1, Backend::Pacman);
+        assert_eq!(
+            os_release("ID=fedora\nID_LIKE=arch").1,
+            Backend::Unsupported
+        );
+        assert_eq!(
+            os_release("ID=manjaro\nID_LIKE=arch").1,
+            Backend::Unsupported
+        );
     }
 }

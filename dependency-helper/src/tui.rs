@@ -1,4 +1,6 @@
-use cabbage_dependency_helper::{probe, write_report, Client, Phase, Plan, Report};
+use cabbage_dependency_helper::{
+    probe, transaction, write_report, Backend, Client, Phase, Plan, Report,
+};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout},
@@ -72,7 +74,13 @@ fn draw(frame: &mut Frame, plan: &Plan, install_selected: bool, scroll: u16) {
             .block(Block::bordered()),
         areas[1],
     );
-    frame.render_widget(Paragraph::new("This also updates installed system packages.\nPacman will show the full transaction before you approve it.").style(Style::default().fg(GOLD)).wrap(Wrap{trim:false}).block(Block::bordered()),areas[2]);
+    frame.render_widget(
+        Paragraph::new(plan.backend.notice())
+            .style(Style::default().fg(GOLD))
+            .wrap(Wrap { trim: false })
+            .block(Block::bordered()),
+        areas[2],
+    );
     let chosen = Style::default()
         .fg(Color::Black)
         .bg(GOLD)
@@ -235,6 +243,7 @@ pub fn run() -> Result<(), String> {
             Plan {
                 client,
                 system: "CachyOS (preview)".into(),
+                backend: Backend::Pacman,
                 supported: true,
                 missing: vec![cabbage_dependency_helper::Requirement {
                     name: "Wine".into(),
@@ -245,7 +254,7 @@ pub fn run() -> Result<(), String> {
             probe(client)
         };
         if !plan.supported {
-            return Err("Automatic setup currently supports Arch and CachyOS x64 only.".into());
+            return Err("Automatic setup supports Arch, CachyOS, Debian 12/13 and Ubuntu 22.04/24.04 on x64.".into());
         }
         if plan.missing.is_empty() {
             report(Phase::Finished, "Requirements are already installed.")?;
@@ -259,7 +268,7 @@ pub fn run() -> Result<(), String> {
             println!("Preview only. No packages were installed.");
             return Ok(());
         }
-        if PathBuf::from("/var/lib/pacman/db.lck").exists() {
+        if plan.backend == Backend::Pacman && PathBuf::from("/var/lib/pacman/db.lck").exists() {
             return Err("Another package transaction is running. Finish it and try again.".into());
         }
         let live = probe(client);
@@ -273,21 +282,24 @@ pub fn run() -> Result<(), String> {
                     .into(),
             );
         }
-        let arguments = live.arguments()?;
+        if live.backend != plan.backend || !live.supported {
+            return Err("System changed during review. Reopen setup.".into());
+        }
+        live.arguments()?;
         report(
             Phase::Installing,
             "Installing requirements in the terminal…",
         )?;
         println!("\x1b[38;2;240;160;0mCabbage · Installing requirements\x1b[0m\nKeep this terminal open until installation finishes.\n");
-        let mut command = Command::new("/usr/bin/sudo");
-        command.args(arguments);
-        clean_environment(&mut command);
-        let exit = command
-            .status()
-            .map_err(|_| "Cannot start sudo and pacman.")?;
-        if !exit.success() {
-            return Err("Package installation did not finish. Check the terminal output and retry when ready.".into());
-        }
+        transaction(&live, |arguments| {
+            let mut command = Command::new("/usr/bin/sudo");
+            command.args(arguments);
+            clean_environment(&mut command);
+            command
+                .status()
+                .map(|exit| exit.success())
+                .map_err(|_| "Cannot start the package manager.".into())
+        })?;
         let remaining = probe(client);
         if !remaining.missing.is_empty() {
             return Err(format!(
@@ -322,6 +334,7 @@ mod tests {
         let plan = Plan {
             client: Client::OfficialOsrs,
             system: "CachyOS".into(),
+            backend: Backend::Pacman,
             supported: true,
             missing: vec![cabbage_dependency_helper::Requirement {
                 name: "Wine".into(),
@@ -342,10 +355,37 @@ mod tests {
         assert!(!text.contains(" Install "));
     }
     #[test]
+    fn apt_review_describes_refresh_without_promising_system_upgrade() {
+        let plan = Plan {
+            client: Client::OfficialOsrs,
+            system: "Ubuntu 24.04".into(),
+            backend: Backend::Apt { t64: true },
+            supported: true,
+            missing: vec![cabbage_dependency_helper::Requirement {
+                name: "Wine".into(),
+                package: "wine".into(),
+            }],
+        };
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|frame| draw(frame, &plan, false, 0)).unwrap();
+        let text = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(text.contains("Package lists will be refreshed"));
+        assert!(text.contains("APT will show the full transaction"));
+        assert!(!text.contains("updates installed system packages"));
+    }
+    #[test]
     fn preview_shows_packages_and_system_update_before_consent() {
         let plan = Plan {
             client: Client::OfficialOsrs,
             system: "CachyOS".into(),
+            backend: Backend::Pacman,
             supported: true,
             missing: vec![cabbage_dependency_helper::Requirement {
                 name: "Wine".into(),
