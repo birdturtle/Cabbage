@@ -20,10 +20,13 @@ pub fn probe() -> Vec<Plan> {
         .map(cabbage_dependency_helper::probe)
         .collect()
 }
-fn terminal(helper: &Path, client: Client, report: &Path, token: &str) -> Result<Command, String> {
-    let candidates: [(&str, &[&str]); 7] = [
+fn terminal_program(
+    exists: impl Fn(&str) -> bool,
+) -> Result<(&'static str, &'static [&'static str]), String> {
+    let candidates: [(&str, &[&str]); 8] = [
         ("/usr/bin/konsole", &["--separate", "-e"]),
         ("/usr/bin/gnome-terminal", &["--wait", "--"]),
+        ("/usr/bin/ptyxis", &["--standalone", "--"]),
         (
             "/usr/bin/xfce4-terminal",
             &["--disable-server", "--execute"],
@@ -33,10 +36,16 @@ fn terminal(helper: &Path, client: Client, report: &Path, token: &str) -> Result
         ("/usr/bin/foot", &["--"]),
         ("/usr/bin/xterm", &["-e"]),
     ];
-    let (program, args) = candidates
+    candidates
         .into_iter()
-        .find(|(path, _)| Path::new(path).is_file())
-        .ok_or("Install a terminal emulator, such as Konsole, to open dependency setup.")?;
+        .find(|(path, _)| exists(path))
+        .ok_or_else(|| {
+            "Install a terminal emulator, such as Ptyxis or Konsole, to open dependency setup."
+                .into()
+        })
+}
+fn terminal(helper: &Path, client: Client, report: &Path, token: &str) -> Result<Command, String> {
+    let (program, args) = terminal_program(|path| Path::new(path).is_file())?;
     let mut command = Command::new(program);
     command
         .args(args)
@@ -145,4 +154,16 @@ pub fn install(
     })();
     let _ = fs::remove_dir_all(folder);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn fedora_ptyxis_only_desktop_can_open_setup_in_a_separate_process() {
+        let (program, arguments) = terminal_program(|path| path == "/usr/bin/ptyxis").unwrap();
+        assert_eq!(program, "/usr/bin/ptyxis");
+        assert_eq!(arguments, ["--standalone", "--"]);
+        assert!(terminal_program(|_| false).is_err());
+    }
 }

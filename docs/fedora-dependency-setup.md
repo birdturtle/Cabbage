@@ -2,6 +2,8 @@
 
 Automatic dependency setup supports standard Fedora 43 and 44 on x64. It requires the Fedora ID, supported VERSION_ID and /usr/bin/dnf. Atomic variants are excluded by VARIANT_ID and the /run/ostree-booted marker. Fedora derivatives and unsupported versions keep their existing launch behavior.
 
+Ptyxis, the terminal supplied by Fedora Workstation, is supported with a standalone process and direct command arguments. Existing terminal windows are not reused.
+
 The same terminal helper reviews missing requirements and defaults to Cancel. After approval it runs:
 
 ```sh
