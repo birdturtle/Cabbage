@@ -17,4 +17,4 @@ Debian 12 and Ubuntu 22.04 use libasound2; Debian 13 and Ubuntu 24.04 use libaso
 
 Tests cover release detection, package mapping and allowlisting, failed refresh stopping installation, failed install, successful transaction sequencing and APT review text. CI also simulates the complete dependency transaction in each of the four distro containers without installing packages.
 
-An interactive install and cancellation still need acceptance in a Debian/Ubuntu desktop VM. No Debian/Ubuntu package transaction has been run on the development host.
+The user reported successful dependency setup in a Debian 13 desktop VM after granting their VM account sudo access. Cancellation was not separately reported. Ubuntu interactive acceptance remains pending. No Debian/Ubuntu package transaction has been run on the development host.
