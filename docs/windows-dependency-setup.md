@@ -22,4 +22,4 @@ Setup progress and errors stay in the existing launch area. Launcher updates wai
 
 Cross-platform tests cover trusted download hosts, installer outcomes, consent before installation, cancellation, selected-client targeting and progress/retry UI. Windows-only tests reject an unsigned executable, validate registry version strings and simulate a cancelled UAC prompt without installing packages.
 
-Windows CI must pass before preparing a test executable. Interactive acceptance remains: fresh Windows without WebView2, missing Visual C++ runtime, UAC denial, network failure, successful installation and retry. No release tag is created for this work.
+Windows and Linux CI passed. The Windows package build passed. The user tested the working-branch executable in a new WinBoat Windows VM and reported that setup works. Individual cases were not separately reported, so cancellation, UAC denial and network interruption still warrant targeted acceptance checks. No release tag was created for this work.
