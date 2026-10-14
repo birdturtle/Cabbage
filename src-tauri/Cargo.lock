@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "cabbage-dependency-helper"
-version = "1.0.0"
+version = "1.1.0-rc.1"
 dependencies = [
  "crossterm",
  "libc",
@@ -475,7 +475,7 @@ dependencies = [
 
 [[package]]
 name = "cabbage-game-host"
-version = "1.0.0"
+version = "1.1.0-rc.1"
 dependencies = [
  "libc",
  "serde",
@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "cabbage-launcher"
-version = "1.0.0"
+version = "1.1.0-rc.1"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",

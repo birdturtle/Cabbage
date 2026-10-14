@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod logs;
 mod game_host;
 mod installation;
 mod accounts;
@@ -271,6 +272,39 @@ fn client_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_data_dir()
         .map(|p| p.join("clients"))
         .map_err(|_| "Cannot locate the client data directory.".into())
+}
+
+fn log_path(app: &tauri::AppHandle, kind: logs::Kind) -> Result<PathBuf, String> {
+    Ok(kind.path(&client_root(app)?, &app.path().home_dir().map_err(|_| "Cannot locate home directory.")?))
+}
+#[tauri::command]
+fn read_log(window: WebviewWindow, app: tauri::AppHandle, state: tauri::State<'_, AppState>, kind: logs::Kind) -> Result<logs::View, String> {
+    local(&window)?;
+    let mut view = logs::read(&log_path(&app, kind)?)?;
+    let account = state.account.lock().unwrap();
+    for saved in &account.book.accounts {
+        for secret in [Some(saved.session.session_id.as_str()), Some(saved.session.refresh_token.as_str()), saved.session.oauth_id_token.as_deref()].into_iter().flatten() {
+            if !secret.is_empty() { view.text = view.text.replace(secret, "[credential omitted]"); }
+        }
+    }
+    Ok(view)
+}
+#[tauri::command]
+fn open_log_folder(window: WebviewWindow, app: tauri::AppHandle, kind: logs::Kind) -> Result<(), String> {
+    local(&window)?;
+    let path = log_path(&app, kind)?;
+    let folder = path.parent().ok_or("Cannot locate log folder.")?;
+    fs::create_dir_all(folder).map_err(|_| "Cannot create log folder.")?;
+    #[cfg(windows)]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(not(windows))]
+    let mut command = std::process::Command::new("xdg-open");
+    command.arg(folder);
+    clients::configure_credentials(&mut command, &[]);
+    for (name, _) in std::env::vars_os() { if name.to_string_lossy().starts_with("JX_") { command.env_remove(name); } }
+    for name in ["LD_LIBRARY_PATH", "LD_PRELOAD", "APPIMAGE", "APPDIR", "ARGV0"] { command.env_remove(name); }
+    command.spawn().map_err(|_| "Cannot open the log folder.")?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -1013,6 +1047,8 @@ fn main() {
             uninstall_launcher,
             keep_portable,
             launcher_status,
+            read_log,
+            open_log_folder,
             launch_client,
             maintain_client,
             select_client,

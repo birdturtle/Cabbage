@@ -13,6 +13,6 @@ Refresh failures stop installation. Zypper retains its transaction confirmation 
 
 Libraries are requested by fixed RPM 64-bit soname capabilities rather than names that vary between releases. For example, libEGL.so.1()(64bit) lets the configured repositories choose the package providing that exact host library. Wine, GNOME Keyring and XWayland use their repository package names. All targets use a fixed allowlist and direct process arguments; capability parentheses never pass through a shell.
 
-Tests cover explicit edition detection, fixed capability targets, transaction arguments and refresh failure stopping installation. CI resolves the full transaction with Zypper's dry-run mode in Tumbleweed and Leap 16.0 containers. Interactive VM acceptance remains pending. No openSUSE package transaction has run on the development host.
+Tests cover explicit edition detection, fixed capability targets, transaction arguments and refresh failure stopping installation. CI resolves the full transaction with Zypper's dry-run mode in Tumbleweed and Leap 16.0 containers. The user reported successful dependency setup on Leap 16.0 after replacing the incompatible Leap 15.5 VM. Cancellation was not separately reported. No openSUSE package transaction has run on the development host.
 
 Reference: [Zypper manual](https://manpages.opensuse.org/Tumbleweed/zypper/zypper.8.en.html).

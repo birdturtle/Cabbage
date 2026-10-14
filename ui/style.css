@@ -153,3 +153,7 @@ dialog .action-row { display:flex; justify-content:flex-end; gap:10px; margin-to
 #update-progress::-webkit-progress-value { background: #f0a000; }
 
 .requirement-actions { display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; }
+
+#logs-panel { margin-top:16px; }
+#logs-panel select { margin:8px 0 12px; max-width:320px; }
+#log-content { width:100%; box-sizing:border-box; height:260px; resize:vertical; background:var(--canvas); color:var(--text); border:1px solid var(--border); padding:12px; font:12px monospace; white-space:pre; }

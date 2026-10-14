@@ -71,6 +71,8 @@ fn main() {
             "uninstall_launcher",
             "keep_portable",
             "launcher_status",
+            "read_log",
+            "open_log_folder",
             "launch_client",
             "maintain_client",
             "select_client",

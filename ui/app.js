@@ -20,6 +20,7 @@ function page(name) {
   document.querySelectorAll('.page').forEach((element) => { element.hidden = element.id !== name; });
   document.querySelectorAll('[data-page]').forEach((element) => element.classList.toggle('active', element.dataset.page === name));
   $('page-name').textContent = name[0].toUpperCase() + name.slice(1);
+  if (name === 'settings') refreshLog();
 }
 
 function toast(message, error = false) {
@@ -84,6 +85,7 @@ function render() {
   }
   $('requirement-actions').hidden = !(status.requirements?.required || status.requirements?.message);
   $('install-requirements').hidden = !status.requirements?.required || status.requirements.canInstall === false;
+  $('view-error-log').hidden = !/log/i.test(status.clientMessage || '');
   setText('play-hint', status.requirements?.message || status.clientMessage || (character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.'));
   setText('client-version', status.clientVersion ? `${clientName} ${status.clientVersion}` : clientName);
   for (const client of status.clients) {
@@ -346,4 +348,27 @@ $('uninstall-launcher').addEventListener('click', () => $('uninstall-launcher-di
 $('cancel-uninstall-launcher').addEventListener('click', () => $('uninstall-launcher-dialog').close());
 $('confirm-uninstall-launcher').addEventListener('click', async () => {
   await action('uninstall_launcher'); $('uninstall-launcher-dialog').close(); await refreshInstallation();
+});
+
+let logRevision = 0;
+async function refreshLog() {
+  if (!invoke) return;
+  const revision = ++logRevision;
+  try {
+    const result = await invoke('read_log', {kind:$('log-source').value});
+    if (revision !== logRevision) return;
+    $('log-content').value = result.text;
+    $('log-note').textContent = `${result.truncated ? 'Showing recent output. ' : ''}Logs may include account or character names.`;
+  } catch (error) { if (revision === logRevision) toast(error, true); }
+}
+$('log-source').addEventListener('change', refreshLog);
+$('refresh-log').addEventListener('click', refreshLog);
+$('open-log-folder').addEventListener('click', () => action('open_log_folder', {kind:$('log-source').value}));
+$('copy-log').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('log-content').value); toast('Log copied.'); }
+  catch { $('log-content').focus(); $('log-content').select(); toast('Select and copy the log text.', true); }
+});
+$('view-error-log').addEventListener('click', () => {
+  $('log-source').value = /wine setup/i.test(status?.clientMessage || '') ? 'wineSetup' : status?.selectedClient || 'runelite';
+  page('settings'); refreshLog(); $('logs-panel').scrollIntoView({block:'start'});
 });
