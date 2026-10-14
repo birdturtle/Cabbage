@@ -55,3 +55,23 @@ jobs:
         run: |
           apt-get update --error-on=any
           apt-get --simulate install --no-remove --reinstall -- wine libsdl2-2.0-0 libegl1 libopengl0 libgl1 xwayland gnome-keyring libx11-6 libxext6 libxi6 libxrender1 libxtst6 libfreetype6 libfontconfig1 ${{ matrix.alsa }}
+
+  fedora-packages:
+    name: Dependency packages (Fedora ${{ matrix.version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['43', '44']
+    container: fedora:${{ matrix.version }}
+    steps:
+      - name: Verify repository package availability without installing
+        run: |
+          dnf --refresh makecache
+          for package in wine sdl2-compat libglvnd-egl libglvnd-opengl libglvnd-glx xorg-x11-server-Xwayland gnome-keyring libX11 libXext libXi libXrender libXtst freetype fontconfig alsa-lib; do
+            dnf repoquery --available --queryformat '%{name}' "$package.x86_64" > /tmp/cabbage-package-query
+            if ! grep -Fxq "$package" /tmp/cabbage-package-query; then
+              echo "Missing dependency package: $package"
+              exit 1
+            fi
+          done

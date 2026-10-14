@@ -34,6 +34,7 @@ pub struct Requirement {
 pub enum Backend {
     Pacman,
     Apt { t64: bool },
+    Dnf,
     Unsupported,
 }
 impl Backend {
@@ -41,12 +42,14 @@ impl Backend {
         match self {
             Self::Pacman => "/usr/bin/pacman",
             Self::Apt { .. } => "/usr/bin/apt-get",
+            Self::Dnf => "/usr/bin/dnf",
             Self::Unsupported => "",
         }
     }
     pub fn notice(self) -> &'static str {
         match self {
             Self::Pacman => "This also updates installed system packages.\nPacman will show the full transaction before you approve it.",
+            Self::Dnf => "Repository metadata will be refreshed before installation.\nDNF will show the full transaction before you approve it.",
             _ => "Package lists will be refreshed before installation.\nAPT will show the full transaction before you approve it.",
         }
     }
@@ -66,8 +69,34 @@ impl Backend {
                 "alsa-lib" => "libasound2",
                 _ => arch,
             }
+        } else if self == Self::Dnf {
+            match arch {
+                "xorg-xwayland" => "xorg-x11-server-Xwayland",
+                "libx11" => "libX11",
+                "libxext" => "libXext",
+                "libxi" => "libXi",
+                "libxrender" => "libXrender",
+                "libxtst" => "libXtst",
+                "freetype2" => "freetype",
+                _ => arch,
+            }
         } else {
             arch
+        }
+    }
+    pub fn graphics_package(self, file: &str) -> &'static str {
+        match self {
+            Self::Apt { .. } => match file {
+                "libEGL.so.1" => "libegl1",
+                "libOpenGL.so.0" => "libopengl0",
+                _ => "libgl1",
+            },
+            Self::Dnf => match file {
+                "libEGL.so.1" => "libglvnd-egl",
+                "libOpenGL.so.0" => "libglvnd-opengl",
+                _ => "libglvnd-glx",
+            },
+            _ => "libglvnd",
         }
     }
 }
@@ -87,6 +116,18 @@ impl Plan {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect()
+    }
+    pub fn reinstall_arguments(&self) -> Result<Vec<String>, String> {
+        if self.backend != Backend::Dnf {
+            return Err("Unsupported repair operation.".into());
+        }
+        let mut args = self.arguments()?;
+        let operation = args
+            .iter_mut()
+            .find(|arg| arg.as_str() == "install")
+            .ok_or("Missing install operation.")?;
+        *operation = "reinstall".into();
+        Ok(args)
     }
     pub fn arguments(&self) -> Result<Vec<String>, String> {
         if !self.supported || self.missing.is_empty() {
@@ -126,6 +167,23 @@ impl Plan {
                 "libfontconfig1",
                 if t64 { "libasound2t64" } else { "libasound2" },
             ],
+            Backend::Dnf => &[
+                "wine",
+                "sdl2-compat",
+                "libglvnd-egl",
+                "libglvnd-opengl",
+                "libglvnd-glx",
+                "xorg-x11-server-Xwayland",
+                "gnome-keyring",
+                "libX11",
+                "libXext",
+                "libXi",
+                "libXrender",
+                "libXtst",
+                "freetype",
+                "fontconfig",
+                "alsa-lib",
+            ],
             Backend::Unsupported => return Err("Unsupported package manager.".into()),
         };
         if packages.iter().any(|p| !allowed.contains(&p.as_str())) {
@@ -151,9 +209,27 @@ impl Plan {
             .iter()
             .map(|s| (*s).into())
             .collect(),
+            Backend::Dnf => [
+                "--",
+                "/usr/bin/dnf",
+                "--refresh",
+                "--setopt=assumeyes=False",
+                "--setopt=assumeno=False",
+                "install",
+                "--",
+            ]
+            .iter()
+            .map(|s| (*s).into())
+            .collect(),
             Backend::Unsupported => unreachable!(),
         };
-        args.extend(packages);
+        args.extend(packages.into_iter().map(|package| {
+            if self.backend == Backend::Dnf {
+                format!("{package}.x86_64")
+            } else {
+                package
+            }
+        }));
         Ok(args)
     }
 }
@@ -171,6 +247,24 @@ pub fn os_release(text: &str) -> (String, Backend) {
             ("arch" | "cachyos", _) => Backend::Pacman,
             ("debian", Some("12")) | ("ubuntu", Some("22.04")) => Backend::Apt { t64: false },
             ("debian", Some("13")) | ("ubuntu", Some("24.04")) => Backend::Apt { t64: true },
+            ("fedora", Some("43" | "44"))
+                if !matches!(
+                    value("VARIANT_ID").as_deref(),
+                    Some(
+                        "silverblue"
+                            | "kinoite"
+                            | "sericea"
+                            | "onyx"
+                            | "sway-atomic"
+                            | "budgie-atomic"
+                            | "cosmic-atomic"
+                            | "coreos"
+                            | "iot"
+                    )
+                ) =>
+            {
+                Backend::Dnf
+            }
             _ => Backend::Unsupported,
         },
     )
@@ -279,13 +373,8 @@ pub fn probe(client: Client) -> Plan {
                 ("libOpenGL.so.0", "OpenGL", "libglvnd"),
             ] {
                 if !library(file) {
-                    let package = if matches!(backend, Backend::Apt { .. }) && package == "libglvnd"
-                    {
-                        match file {
-                            "libEGL.so.1" => "libegl1",
-                            "libOpenGL.so.0" => "libopengl0",
-                            _ => "libgl1",
-                        }
+                    let package = if package == "libglvnd" {
+                        backend.graphics_package(file)
                     } else {
                         package
                     };
@@ -306,13 +395,8 @@ pub fn probe(client: Client) -> Plan {
                 ("libGL.so.1", "OpenGL", "libglvnd"),
             ] {
                 if !library(file) {
-                    let package = if matches!(backend, Backend::Apt { .. }) && package == "libglvnd"
-                    {
-                        match file {
-                            "libEGL.so.1" => "libegl1",
-                            "libOpenGL.so.0" => "libopengl0",
-                            _ => "libgl1",
-                        }
+                    let package = if package == "libglvnd" {
+                        backend.graphics_package(file)
                     } else {
                         package
                     };
@@ -327,7 +411,8 @@ pub fn probe(client: Client) -> Plan {
         backend,
         supported: backend != Backend::Unsupported
             && std::env::consts::ARCH == "x86_64"
-            && Path::new(backend.executable()).is_file(),
+            && Path::new(backend.executable()).is_file()
+            && !(backend == Backend::Dnf && Path::new("/run/ostree-booted").exists()),
         missing,
     }
 }
@@ -482,6 +567,81 @@ mod tests {
         assert_eq!(calls.len(), 2);
         assert_eq!(calls[1][2], "install");
         assert!(transaction(&plan, |_| Ok(true)).is_ok());
+    }
+    #[test]
+    fn fedora_mapping_and_transaction_preserve_consent() {
+        for version in ["43", "44"] {
+            assert_eq!(
+                os_release(&format!(
+                    "ID=fedora\nVERSION_ID={version}\nVARIANT_ID=workstation"
+                ))
+                .1,
+                Backend::Dnf
+            );
+        }
+        for variant in [
+            "silverblue",
+            "kinoite",
+            "coreos",
+            "iot",
+            "sway-atomic",
+            "cosmic-atomic",
+        ] {
+            assert_eq!(
+                os_release(&format!("ID=fedora\nVERSION_ID=44\nVARIANT_ID={variant}")).1,
+                Backend::Unsupported
+            );
+        }
+        assert_eq!(
+            os_release("ID=nobara\nID_LIKE=fedora\nVERSION_ID=44").1,
+            Backend::Unsupported
+        );
+        assert_eq!(
+            os_release("ID=fedora\nVERSION_ID=rawhide").1,
+            Backend::Unsupported
+        );
+        let backend = Backend::Dnf;
+        assert_eq!(backend.package("libxi"), "libXi");
+        assert_eq!(backend.graphics_package("libEGL.so.1"), "libglvnd-egl");
+        let mut plan = Plan {
+            client: Client::OfficialOsrs,
+            system: "Fedora".into(),
+            backend,
+            supported: true,
+            missing: vec![Requirement {
+                name: "Wine".into(),
+                package: "wine".into(),
+            }],
+        };
+        let args = plan.arguments().unwrap();
+        assert_eq!(
+            args,
+            [
+                "--",
+                "/usr/bin/dnf",
+                "--refresh",
+                "--setopt=assumeyes=False",
+                "--setopt=assumeno=False",
+                "install",
+                "--",
+                "wine.x86_64"
+            ]
+        );
+        assert!(plan
+            .reinstall_arguments()
+            .unwrap()
+            .contains(&"reinstall".into()));
+        let mut calls = 0;
+        assert!(transaction(&plan, |_| {
+            calls += 1;
+            Ok(false)
+        })
+        .is_err());
+        assert_eq!(calls, 1);
+        for invalid in ["--allowerasing", "wine*", "wine.i686", "@development-tools"] {
+            plan.missing[0].package = invalid.into();
+            assert!(plan.arguments().is_err());
+        }
     }
     #[test]
     fn session_reports_replace_atomically_without_exposing_other_files() {

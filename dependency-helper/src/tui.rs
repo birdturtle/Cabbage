@@ -254,7 +254,7 @@ pub fn run() -> Result<(), String> {
             probe(client)
         };
         if !plan.supported {
-            return Err("Automatic setup supports Arch, CachyOS, Debian 12/13 and Ubuntu 22.04/24.04 on x64.".into());
+            return Err("Automatic setup supports Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04 and Fedora 43/44 on x64.".into());
         }
         if plan.missing.is_empty() {
             report(Phase::Finished, "Requirements are already installed.")?;
@@ -300,7 +300,33 @@ pub fn run() -> Result<(), String> {
                 .map(|exit| exit.success())
                 .map_err(|_| "Cannot start the package manager.".into())
         })?;
-        let remaining = probe(client);
+        let mut remaining = probe(client);
+        if remaining.backend == Backend::Dnf && remaining.supported && !remaining.missing.is_empty()
+        {
+            if remaining
+                .packages()
+                .iter()
+                .any(|package| !plan.packages().contains(package))
+            {
+                return Err(
+                    "Requirements changed during setup. Reopen setup to review the new packages."
+                        .into(),
+                );
+            }
+            // DNF install leaves already installed packages alone even if files are missing.
+            // Reinstall only reviewed packages that still fail the host probe.
+            let mut command = Command::new("/usr/bin/sudo");
+            command.args(remaining.reinstall_arguments()?);
+            clean_environment(&mut command);
+            if !command
+                .status()
+                .map_err(|_| "Cannot start DNF repair.")?
+                .success()
+            {
+                return Err("Dependency repair did not finish. Check the terminal output and retry when ready.".into());
+            }
+            remaining = probe(client);
+        }
         if !remaining.missing.is_empty() {
             return Err(format!(
                 "Setup finished, but these requirements are still missing: {}.",
@@ -378,6 +404,31 @@ mod tests {
             .collect::<String>();
         assert!(text.contains("Package lists will be refreshed"));
         assert!(text.contains("APT will show the full transaction"));
+        assert!(!text.contains("updates installed system packages"));
+    }
+    #[test]
+    fn fedora_review_names_dnf_and_keeps_cancel_selected() {
+        let plan = Plan {
+            client: Client::OfficialOsrs,
+            system: "Fedora 44".into(),
+            backend: Backend::Dnf,
+            supported: true,
+            missing: vec![cabbage_dependency_helper::Requirement {
+                name: "Wine".into(),
+                package: "wine".into(),
+            }],
+        };
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|frame| draw(frame, &plan, false, 0)).unwrap();
+        let text = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(text.contains("DNF will show the full transaction"));
         assert!(!text.contains("updates installed system packages"));
     }
     #[test]
