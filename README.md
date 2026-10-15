@@ -6,6 +6,8 @@ Sign in with your Jagex account, choose a character and client, and press **Play
 
 [Download Cabbage](https://github.com/birdturtle/Cabbage/releases/latest)
 
+VirusTotal reports for **1.1.0**: [Windows EXE](https://www.virustotal.com/gui/file/c5656ac320e665b13f04fe48331218ba195dab7804ccaddba93c106d5269f884) · [Linux AppImage](https://www.virustotal.com/gui/file/33d510ccc493ef5b6c91520de57177ee0e10c0504dd0e49f0a256622c4874e20)
+
 ![Cabbage launcher](docs/images/cabbage-launcher.png)
 
 ## Clients
