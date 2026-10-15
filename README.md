@@ -79,6 +79,8 @@ Right-click a client card to **Repair** or **Uninstall** that client.
 - Cabbage has no account server. Your login tokens are not sent to the developer.
 - **Remove** deletes that account's saved session from Cabbage. It does not delete your Jagex account or revoke sessions through Jagex.
 
+We recommend enabling [two-factor authentication with an authenticator app](https://support.runescape.com/hc/en-gb/articles/34154914236817) on your Jagex account, whichever launcher you use.
+
 The [authentication](src-tauri/src/auth.rs) and [account storage](src-tauri/src/storage.rs) code is public.
 
 ## Settings
