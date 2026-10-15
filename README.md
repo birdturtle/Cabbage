@@ -34,7 +34,7 @@ Cabbage offers to install missing Windows runtimes with your approval.
 - Wine for the official Old School client.
 - SDL2, EGL and OpenGL libraries for RuneScape.
 
-**Install requirements** opens a terminal to install missing game dependencies. Supported systems: Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04, Fedora 43/44, openSUSE Tumbleweed and Leap 16.0. Linux dependency installation requires sudo. On Arch and CachyOS, it also updates system packages.
+**Install requirements** opens a terminal to install missing game dependencies. Supported systems: Arch, Debian 12/13, Ubuntu 22.04/24.04, Fedora 43/44, openSUSE Tumbleweed and Leap 16.0. Linux dependency installation requires sudo. On Arch it also updates system packages.
 
 Cabbage downloads RuneLite's Java runtime and RuneScape's OpenSSL compatibility libraries automatically.
 
