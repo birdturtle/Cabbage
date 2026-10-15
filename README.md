@@ -71,6 +71,16 @@ You can add multiple accounts and switch between them. Use **Remove** to remove 
 
 Right-click a client card to **Repair** or **Uninstall** that client.
 
+## Jagex account security
+
+- Sign-in happens on Jagex's website inside the login window. Cabbage does not read or store your Jagex password or two-factor authentication codes.
+- Cabbage receives login tokens from Jagex to load your characters, launch games and renew your login.
+- Saved account sessions are encrypted on your computer. The encryption key is stored in Windows Credential Manager or your Linux desktop keyring. Tokens are not saved as plain text.
+- Cabbage has no account server. Your login tokens are not sent to the developer.
+- **Remove** deletes that account's saved session from Cabbage. It does not delete your Jagex account or revoke sessions through Jagex.
+
+The [authentication](src-tauri/src/auth.rs) and [account storage](src-tauri/src/storage.rs) code is public.
+
 ## Settings
 
 - Keep Cabbage open, hide it to the system tray, or close it after Play.
