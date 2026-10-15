@@ -23,13 +23,18 @@ Sign in with your Jagex account, choose a character and client, and press **Play
 - [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section) for the launcher.
 - [Microsoft Visual C++ Redistributable x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) for the official Old School client.
 
+Cabbage offers to install missing Windows runtimes with your approval.
+
 ### Linux
 
+- glibc 2.35 or newer.
 - [FUSE support](https://docs.appimage.org/user-guide/troubleshooting/fuse.html) to run the AppImage.
 - A running, unlocked desktop keyring with Secret Service support, such as GNOME Keyring or KWallet with Secret Service enabled.
 - XWayland when using a Wayland desktop.
 - Wine for the official Old School client.
 - SDL2, EGL and OpenGL libraries for RuneScape.
+
+**Install requirements** opens a terminal to install missing game dependencies. Supported systems: Arch, CachyOS, Debian 12/13, Ubuntu 22.04/24.04, Fedora 43/44, openSUSE Tumbleweed and Leap 16.0. Linux dependency installation requires sudo. On Arch and CachyOS, it also updates system packages.
 
 Cabbage downloads RuneLite's Java runtime and RuneScape's OpenSSL compatibility libraries automatically.
 
@@ -72,6 +77,7 @@ Right-click a client card to **Repair** or **Uninstall** that client.
 - Prefer your dedicated GPU; useful for those with integrated graphics and discrete graphics.
 - Check for launcher updates on startup.
 - Include beta updates if you want to try prereleases.
+- View and copy game logs under **Advanced**, or open their folder.
 
 Closing the window hides Cabbage to the tray. Use the tray menu to restore the window or exit. Exiting Cabbage leaves running games open.
 
