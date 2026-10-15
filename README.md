@@ -44,7 +44,7 @@ Download the file for your system from the [latest release](https://github.com/b
 
 ### Windows
 
-1. Open `Cabbage-Windows-x64-1.0.0.exe`.
+1. Open `Cabbage-Windows-x64-1.1.0.exe`.
 2. Choose **Install Cabbage** to add it to your Start Menu, or **Keep portable** to run it from the downloaded file.
 
 Installation does not require administrator access.
@@ -54,8 +54,8 @@ Installation does not require administrator access.
 Make the AppImage executable and open it:
 
 ```sh
-chmod +x Cabbage-Linux-x64-1.0.0.AppImage
-./Cabbage-Linux-x64-1.0.0.AppImage
+chmod +x Cabbage-Linux-x64-1.1.0.AppImage
+./Cabbage-Linux-x64-1.1.0.AppImage
 ```
 
 Choose **Install Cabbage** to add it to your application menu, or **Keep portable**. Installation does not require sudo.
