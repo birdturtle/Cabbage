@@ -20,7 +20,7 @@ function page(name) {
   document.querySelectorAll('.page').forEach((element) => { element.hidden = element.id !== name; });
   document.querySelectorAll('[data-page]').forEach((element) => element.classList.toggle('active', element.dataset.page === name));
   $('page-name').textContent = name[0].toUpperCase() + name.slice(1);
-  if (name === 'settings') refreshLog();
+  if (name === 'settings' && $('advanced-settings').open) refreshLog();
 }
 
 function toast(message, error = false) {
@@ -361,6 +361,7 @@ async function refreshLog() {
     $('log-note').textContent = `${result.truncated ? 'Showing recent output. ' : ''}Logs may include account or character names.`;
   } catch (error) { if (revision === logRevision) toast(error, true); }
 }
+$('advanced-settings').addEventListener('toggle', () => { if ($('advanced-settings').open) refreshLog(); });
 $('log-source').addEventListener('change', refreshLog);
 $('refresh-log').addEventListener('click', refreshLog);
 $('open-log-folder').addEventListener('click', () => action('open_log_folder', {kind:$('log-source').value}));
@@ -370,5 +371,6 @@ $('copy-log').addEventListener('click', async () => {
 });
 $('view-error-log').addEventListener('click', () => {
   $('log-source').value = /wine setup/i.test(status?.clientMessage || '') ? 'wineSetup' : status?.selectedClient || 'runelite';
-  page('settings'); refreshLog(); $('logs-panel').scrollIntoView({block:'start'});
+  $('advanced-settings').open = true;
+  page('settings'); $('logs-panel').scrollIntoView({block:'start'});
 });
