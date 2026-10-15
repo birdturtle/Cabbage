@@ -155,8 +155,9 @@ dialog .action-row { display:flex; justify-content:flex-end; gap:10px; margin-to
 .requirement-actions { display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; }
 
 #logs-panel { margin-top:16px; }
-#logs-panel select { margin:8px 0 12px; max-width:320px; }
-#log-content { width:100%; box-sizing:border-box; height:260px; resize:vertical; background:var(--canvas); color:var(--text); border:1px solid var(--border); padding:12px; font:12px monospace; white-space:pre; }
+#logs-panel .log-source-row { display:flex; align-items:center; gap:12px; margin:8px 0 16px; }
+#logs-panel select { flex:0 1 320px; width:320px; max-width:100%; height:32px; padding:4px 10px; }
+#log-content { width:100%; box-sizing:border-box; height:180px; resize:vertical; background:var(--canvas); color:var(--text); border:1px solid var(--border); padding:12px; font:12px monospace; white-space:pre; }
 
 #advanced-settings { margin-top:16px; }
 #advanced-settings > summary { cursor:pointer; color:var(--muted); }
