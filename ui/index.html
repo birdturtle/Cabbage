@@ -58,7 +58,7 @@
           <h2>Updates</h2>
           <label class="preference-row"><input type="checkbox" name="checkUpdatesOnStartup"><span>Check for updates when the launcher opens</span></label>
           <label class="preference-row"><input type="checkbox" name="includeBetaUpdates"><span>Include beta updates</span></label>
-          <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
+          <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup update checks apply next time Cabbage opens. Launch behavior applies on your next Play.</p>
         </form>
         <article class="panel" id="launcher-installation" hidden>
           <h2>Installation</h2>
@@ -67,6 +67,15 @@
         </article>
         <details id="advanced-settings">
           <summary>Advanced</summary>
+        <article class="panel" id="developer-plugins-panel">
+          <h2>Developer plugins · RuneLite</h2>
+          <label class="preference-row"><input type="checkbox" id="developer-plugins-enabled"><span>Launch RuneLite with developer plugins</span></label>
+          <p class="help-text" id="developer-plugin-timing">Applies to your next RuneLite launch. No Cabbage restart is needed; an already-running RuneLite client stays unchanged.</p>
+          <p class="help-text">Local plugins are not reviewed by RuneLite. Only add JARs from people you trust; they run with access to your client and account session.</p>
+          <div id="developer-plugins-list"></div>
+          <div class="action-row"><button class="button" id="add-developer-plugin">Add plugin JAR…</button></div>
+          <p class="help-text">On first use, your existing RuneLite profiles, plugin choices and supported plugin data are copied into a separate beta profile. Beta settings are kept across JAR updates. Turn this off to launch normal RuneLite; the two profiles do not sync. Close RuneLite before changing JARs.</p>
+        </article>
         <article class="panel" id="logs-panel">
           <h2>Logs</h2>
           <label class="log-source-row" for="log-source"><span>Log</span><select id="log-source"><option value="runelite">RuneLite launch</option><option value="runeliteClient">RuneLite client</option><option value="officialOsrs">OSRS launch</option><option value="wineSetup">Wine setup</option><option value="officialRs3">RS3 launch</option></select></label>

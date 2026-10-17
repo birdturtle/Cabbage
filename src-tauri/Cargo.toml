@@ -1,6 +1,6 @@
 [package]
 name = "cabbage-launcher"
-version = "1.1.0"
+version = "1.2.0-beta.1"
 edition = "2021"
 
 [build-dependencies]
@@ -10,6 +10,7 @@ tauri-build = { version = "2", features = [] }
 cabbage-game-host = { path = "../game-host" }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

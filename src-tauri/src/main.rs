@@ -12,6 +12,8 @@ mod maintenance;
 mod osrs;
 mod rs3;
 mod runelite;
+mod developer_plugins;
+mod developer_profile;
 mod settings;
 mod storage;
 mod tray;
@@ -204,6 +206,82 @@ fn save_preferences(
     Ok(())
 }
 
+// The file picker is exposed only through the authenticated local launcher window.
+#[tauri::command]
+async fn add_developer_plugin(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_dialog::DialogExt;
+    local(&window)?;
+    let handle = app.clone();
+    let plugin = tauri::async_runtime::spawn_blocking(
+        move || -> Result<Option<developer_plugins::LocalPlugin>, String> {
+            let file = handle
+                .dialog()
+                .file()
+                .add_filter("RuneLite plugin JAR", &["jar"])
+                .blocking_pick_file();
+            match file {
+                Some(file) => Ok(Some(developer_plugins::inspect(
+                    &file.into_path().map_err(|_| "Choose a local JAR file.")?,
+                )?)),
+                None => Ok(None),
+            }
+        },
+    )
+    .await
+    .map_err(|_| "Could not inspect the selected JAR.")??;
+    if let Some(plugin) = plugin {
+        let state = app.state::<AppState>();
+        let mut current = state.settings.lock().unwrap();
+        let mut updated = current.clone();
+        if updated
+            .developer_plugins
+            .jars
+            .iter()
+            .any(|p| p.path == plugin.path || p.sha256 == plugin.sha256)
+        {
+            return Err("This plugin JAR is already listed.".into());
+        }
+        if updated.developer_plugins.jars.len() >= 16 {
+            return Err("Remove a plugin before adding another (maximum 16).".into());
+        }
+        updated.developer_plugins.jars.push(plugin);
+        persist_settings(&app, &updated)?;
+        *current = updated;
+    }
+    Ok(())
+}
+#[tauri::command]
+fn configure_developer_plugins(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    enabled: bool,
+    plugin: Option<String>,
+    remove: Option<bool>,
+    plugin_enabled: Option<bool>,
+) -> Result<(), String> {
+    local(&window)?;
+    let state = app.state::<AppState>();
+    let mut current = state.settings.lock().unwrap();
+    let mut updated = current.clone();
+    updated.developer_plugins.enabled = enabled;
+    if let Some(hash) = plugin {
+        let index = updated
+            .developer_plugins
+            .jars
+            .iter()
+            .position(|p| p.sha256 == hash)
+            .ok_or("Plugin is no longer listed.")?;
+        if remove.unwrap_or(false) {
+            updated.developer_plugins.jars.remove(index);
+        } else if let Some(value) = plugin_enabled {
+            updated.developer_plugins.jars[index].enabled = value;
+        }
+    }
+    persist_settings(&app, &updated)?;
+    *current = updated;
+    Ok(())
+}
+
 fn persist_settings(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
     let path = config(app)?;
     fs::create_dir_all(path.parent().unwrap())
@@ -391,8 +469,17 @@ async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<S
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         let state = handle.state::<AppState>();
         let root = client_root(&handle)?;
+        let developer = state.settings.lock().unwrap().developer_plugins.clone();
+        if developer_plugins::enabled_for(&developer, selected) {
+            developer_plugins::preflight(&developer)?;
+        }
         // Downloads may take time. Renew the captured account/character immediately before spawning.
         let prepared = tauri::async_runtime::block_on(selected.prepare(&root, &progress))?;
+        let developer_runtime = match &prepared {
+            clients::PreparedClient::RuneLite {root, ..} if developer_plugins::enabled_for(&developer, selected) =>
+                Some(tauri::async_runtime::block_on(developer_plugins::prepare(root, &developer, &progress, &handle.path().home_dir().map_err(|_| "Cannot locate RuneLite settings.")?))?),
+            _ => None,
+        };
         let credentials = prepare_play(&handle, &target)?;
         let prefer_gpu = state
             .settings
@@ -400,7 +487,11 @@ async fn launch_client(window: WebviewWindow, app: tauri::AppHandle) -> Result<S
             .unwrap()
             .preferences
             .prefer_dedicated_gpu;
-        let child = prepared.spawn(&credentials, prefer_gpu)?;
+        let child = match (prepared, developer_runtime) {
+            (clients::PreparedClient::RuneLite {root, install}, Some(runtime)) =>
+                developer_plugins::spawn(&root, &install, &runtime, &credentials, prefer_gpu)?,
+            (prepared, _) => prepared.spawn(&credentials, prefer_gpu)?,
+        };
         state
             .clients
             .lock()
@@ -970,6 +1061,7 @@ fn main() {
     #[cfg(target_os = "linux")]
     gtk::glib::set_prgname(Some("com.birdturtle.cabbage"));
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             #[cfg(windows)]
             if args.iter().any(|arg| arg == "--uninstall-launcher") {
@@ -1053,6 +1145,8 @@ fn main() {
             maintain_client,
             select_client,
             save_preferences,
+            add_developer_plugin,
+            configure_developer_plugins,
             begin_login,
             cancel_login,
             load_accounts,

@@ -4,7 +4,7 @@ An unofficial launcher for Old School RuneScape and RuneScape on Windows and Lin
 
 Sign in with your Jagex account, choose a character and client, and press **Play**. Cabbage downloads the client for you and remembers your accounts for next time.
 
-[Download Cabbage](https://github.com/birdturtle/Cabbage/releases/latest)
+[Download stable Cabbage](https://github.com/birdturtle/Cabbage/releases/latest) · [Developer-plugin beta 1.2.0-beta.1](https://github.com/birdturtle/Cabbage/releases/tag/v1.2.0-beta.1)
 
 VirusTotal reports for **1.1.0**: [Windows EXE](https://www.virustotal.com/gui/file/c5656ac320e665b13f04fe48331218ba195dab7804ccaddba93c106d5269f884) · [Linux AppImage](https://www.virustotal.com/gui/file/33d510ccc493ef5b6c91520de57177ee0e10c0504dd0e49f0a256622c4874e20)
 
@@ -126,3 +126,7 @@ Uninstalling the launcher keeps saved accounts, settings and downloaded games. U
 BSD 2-Clause. See [LICENSE](LICENSE) and [third-party notices](THIRD-PARTY-NOTICES.md). Based on HapticScape's launcher.
 
 Unofficial software. Not affiliated with Jagex or RuneLite.
+
+## Local developer plugins
+
+For private RuneLite plugin testing, **Settings → Advanced → Developer plugins** lets you select plugin JARs and opt into a separate developer launch. Normal RuneLite remains available by switching the option off. Local plugins are unreviewed and must be trusted. See [setup, packaging and compatibility notes](docs/developer-plugins.md).

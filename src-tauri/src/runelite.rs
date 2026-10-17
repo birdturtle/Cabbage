@@ -97,7 +97,7 @@ fn jar_path(root: &Path, installed: &Installed) -> PathBuf {
         .join(&installed.jar_hash)
         .join("RuneLite.jar")
 }
-fn java_path(root: &Path, installed: &Installed) -> PathBuf {
+pub(crate) fn java_path(root: &Path, installed: &Installed) -> PathBuf {
     root.join("runtimes")
         .join(&installed.runtime_hash)
         .join(&installed.java)
@@ -568,6 +568,7 @@ mod tests {
             .map(|a| a.to_string_lossy().to_string())
             .collect();
         assert!(args.contains(&"--launch-mode=REFLECT".to_string()));
+        assert!(!args.iter().any(|arg| arg == "--developer-mode" || arg.starts_with("-Duser.home=")));
         assert!(!args
             .iter()
             .any(|a| a.contains("test-session") || a.contains("test-character")));

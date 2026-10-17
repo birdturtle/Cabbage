@@ -7,6 +7,7 @@ pub struct Settings {
     pub preferences: Preferences,
     pub selected_game: Game,
     pub osrs_client: ClientId,
+    pub developer_plugins: crate::developer_plugins::DeveloperPlugins,
 }
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, Debug, PartialEq)]

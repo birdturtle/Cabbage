@@ -77,6 +77,8 @@ fn main() {
             "maintain_client",
             "select_client",
             "save_preferences",
+            "add_developer_plugin",
+            "configure_developer_plugins",
             "begin_login",
             "cancel_login",
             "remove_account",
