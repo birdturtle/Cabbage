@@ -1,0 +1,3 @@
+# Signed fixtures must retain their exact downloaded bytes on Windows as well as Linux.
+src-tauri/src/test-fixtures/runelite-bootstrap.json -text
+src-tauri/src/test-fixtures/runelite-bootstrap.sig -text

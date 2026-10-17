@@ -4,7 +4,7 @@ An unofficial launcher for Old School RuneScape and RuneScape on Windows and Lin
 
 Sign in with your Jagex account, choose a character and client, and press **Play**. Cabbage downloads the client for you and remembers your accounts for next time.
 
-[Download stable Cabbage](https://github.com/birdturtle/Cabbage/releases/latest) · [Developer-plugin beta 1.2.0-beta.1](https://github.com/birdturtle/Cabbage/releases/tag/v1.2.0-beta.1)
+[Download stable Cabbage](https://github.com/birdturtle/Cabbage/releases/latest) · [Developer-plugin beta 1.2.0-beta.2](https://github.com/birdturtle/Cabbage/releases/tag/v1.2.0-beta.2)
 
 VirusTotal reports for **1.1.0**: [Windows EXE](https://www.virustotal.com/gui/file/c5656ac320e665b13f04fe48331218ba195dab7804ccaddba93c106d5269f884) · [Linux AppImage](https://www.virustotal.com/gui/file/33d510ccc493ef5b6c91520de57177ee0e10c0504dd0e49f0a256622c4874e20)
 
