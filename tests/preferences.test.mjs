@@ -49,6 +49,16 @@ function launcher(preferences, options = {}) {
         status.clientAvailable = status.clients.find(client => client.id === args.client).available;
         status.clientMessage = status.clientAvailable ? '' : 'Official client support is not available yet.';
       }
+      if (command === 'launch_client' && options.launchError) throw options.launchError;
+      if (command === 'configure_developer_plugins') {
+        if (options.developerSaveError) throw options.developerSaveError;
+        const config=status.settings.developerPlugins ??= {enabled:false,jars:[]};
+        config.enabled=args.enabled;
+        if (args.plugin) {
+          if (args.remove) config.jars=config.jars.filter(plugin=>plugin.sha256!==args.plugin);
+          else config.jars.find(plugin=>plugin.sha256===args.plugin).enabled=args.pluginEnabled;
+        }
+      }
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
     } } } },
     document: {addEventListener(){}, getElementById: element, querySelectorAll: () => [], createElement: () => element(`option:${Math.random()}`), createElementNS: () => element(`svg:${Math.random()}`) },
@@ -373,4 +383,62 @@ test('Linux dependency installation opens terminal setup without the Windows dia
   app.status.requirements.canInstall=false;await app.poll();
   assert.equal(app.element('install-requirements').hidden,true);
   assert.equal(app.element('requirement-actions').hidden,false);
+});
+
+test('developer plugins are explicit, can be toggled independently, and preserve ordinary preferences', async () => {
+  const app=launcher({afterPlay:'keepOpen',checkUpdatesOnStartup:false},{status:{settings:{
+    selectedGame:'oldschool',osrsClient:'runelite',preferences:{afterPlay:'keepOpen'},
+    developerPlugins:{enabled:false,jars:[]}
+  }}});
+  await settle();
+  assert.equal(app.element('developer-plugins-enabled').checked,false);
+  app.element('developer-plugins-enabled').checked=true;
+  await app.element('developer-plugins-enabled').listeners.change();
+  const saved=app.calls.find(call=>call.command==='configure_developer_plugins');
+  assert.equal(saved.args.enabled,true);
+  assert.equal(app.calls.some(call=>call.command==='save_preferences'),false);
+  await app.element('add-developer-plugin').listeners.click();
+  assert.equal(app.calls.some(call=>call.command==='add_developer_plugin'),true);
+});
+
+test('developer mode confirms next RuneLite launch without requesting a Cabbage restart', async () => {
+  const app=launcher({afterPlay:'keepOpen',checkUpdatesOnStartup:false});
+  await settle();
+  app.element('developer-plugins-enabled').checked=true;
+  await app.element('developer-plugins-enabled').listeners.change();
+  assert.match(app.element('toast').textContent,/next RuneLite launch/);
+  assert.match(app.element('toast').textContent,/no Cabbage restart needed/);
+  assert.equal(app.calls.some(call=>/restart|relaunch/.test(call.command)),false);
+  const html=readFileSync(new URL('../ui/index.html',import.meta.url),'utf8');
+  assert.match(html,/No Cabbage restart is needed/);
+});
+
+test('failed developer-mode save restores the checkbox and does not claim success', async () => {
+  const app=launcher({checkUpdatesOnStartup:false},{developerSaveError:'Cannot save launcher settings.'});
+  await settle();
+  app.element('developer-plugins-enabled').checked=true;
+  await app.element('developer-plugins-enabled').listeners.change();
+  assert.equal(app.element('developer-plugins-enabled').checked,false);
+  assert.equal(app.element('toast').textContent,'Cannot save launcher settings.');
+});
+
+test('failed developer launch can be retried and disabling developer mode keeps the JAR selections', async () => {
+  const jar={name:'test.jar',path:'/download/test.jar',sha256:'a'.repeat(64),enabled:true};
+  const options={launchError:'test.jar changed. Remove it and add the updated JAR again.',status:{
+    settings:{preferences:{checkUpdatesOnStartup:false},selectedGame:'oldschool',osrsClient:'runelite',
+      developerPlugins:{enabled:true,jars:[jar]}},
+    accounts:[{id:'test',name:'Player'}],selectedAccount:'test',characters:[{accountId:'character',displayName:'Player'}],selectedCharacter:'character'
+  }};
+  const app=launcher({checkUpdatesOnStartup:false},options);await settle();
+  await app.element('play').listeners.click();
+  assert.equal(app.element('toast').textContent,options.launchError);
+  assert.equal(app.element('play').disabled,false);
+  app.element('developer-plugins-enabled').checked=false;
+  await app.element('developer-plugins-enabled').listeners.change();
+  assert.equal(app.status.settings.developerPlugins.enabled,false);
+  assert.equal(app.status.settings.developerPlugins.jars.length,1);
+  assert.doesNotMatch(app.element('client-version').textContent,/Developer plugins/);
+  options.launchError='';await app.element('play').listeners.click();
+  assert.equal(app.calls.filter(call=>call.command==='launch_client').length,2);
+  assert.equal(app.calls.some(call=>/restart|relaunch/.test(call.command)),false);
 });

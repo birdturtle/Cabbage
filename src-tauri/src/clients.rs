@@ -353,6 +353,18 @@ mod tests {
         }
     }
     #[test]
+    fn failed_preparation_releases_play_and_keeps_the_error_available_for_retry() {
+        let mut manager=Manager::default();
+        let key=LaunchKey{account:"test account".into(),character:"test character".into()};
+        let progress=manager.begin(ClientId::Runelite,&key).unwrap();
+        assert!(progress.lock().unwrap().busy);
+        manager.finish(ClientId::Runelite,&key,&Err("Plugin JAR is missing.".into()));
+        assert!(!progress.lock().unwrap().busy);
+        assert_eq!(progress.lock().unwrap().message,"Plugin JAR is missing.");
+        assert!(!manager.is_running(&key));
+        assert!(manager.begin(ClientId::Runelite,&key).is_ok());
+    }
+    #[test]
     fn unavailable_adapters_cannot_prepare_or_launch() {
         assert!(ClientId::OfficialRs3
             .unavailable_reason("linux", "aarch64")

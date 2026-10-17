@@ -41,6 +41,7 @@ async function action(command, args = {}) {
     const result = await invoke(command, args);
     if (typeof result === 'string') toast(result);
     else if (command === 'save_preferences') toast('Preferences saved.');
+    else if (command === 'configure_developer_plugins') toast('Developer plugin settings saved. Applies to your next RuneLite launch; no Cabbage restart needed.');
     await refresh();
     return result;
   } catch (error) {
@@ -55,6 +56,7 @@ async function action(command, args = {}) {
 }
 
 function render() {
+  renderDeveloperPlugins();
   document.querySelectorAll('button').forEach((button) => { if (button.id !== 'play') button.disabled = busy && !button.dataset.page && !button.dataset.go; });
 
   setText('check-updates', checkingUpdates ? 'Checking…' : 'Check for updates');
@@ -62,7 +64,8 @@ function render() {
   const selectedGame = status.settings.selectedGame;
   const choices = status.clients.filter(client => client.game === selectedGame);
   setText('launch-title', selectedGame === 'oldschool' ? 'Old School RuneScape' : 'RuneScape');
-  const clientName = choices.find(client => client.id === status.selectedClient)?.name || '';
+  const developer = status.selectedClient === 'runelite' && status.settings.developerPlugins?.enabled;
+  const clientName = (choices.find(client => client.id === status.selectedClient)?.name || '') + (developer ? ' · Developer plugins' : '');
   const character = status.characters.some(item => item.accountId === status.selectedCharacter);
   const playDisabled = Boolean(busy || !status.clientAvailable || status.clientBusy || status.clientRunning || !character || status.needsSignIn || status.signingIn);
   if ($('play').disabled !== playDisabled) $('play').disabled = playDisabled;
@@ -374,3 +377,31 @@ $('view-error-log').addEventListener('click', () => {
   $('advanced-settings').open = true;
   page('settings'); $('logs-panel').scrollIntoView({block:'start'});
 });
+
+function renderDeveloperPlugins() {
+  const config=status?.settings.developerPlugins || {enabled:false,jars:[]};
+  $('developer-plugins-enabled').checked=config.enabled;
+  $('developer-plugins-enabled').disabled=busy;
+  $('add-developer-plugin').disabled=busy;
+  const signature=JSON.stringify(config);
+  if ($('developer-plugins-list').dataset.signature!==signature) {
+    $('developer-plugins-list').replaceChildren();
+    for (const plugin of config.jars) {
+      const row=document.createElement('div'); row.className='developer-plugin';
+      const label=document.createElement('label');label.className='preference-row';
+      const enabled=document.createElement('input');enabled.type='checkbox';enabled.checked=plugin.enabled;enabled.dataset.plugin=plugin.sha256;
+      enabled.addEventListener('change',()=>action('configure_developer_plugins',{
+        enabled:config.enabled,plugin:plugin.sha256,pluginEnabled:enabled.checked}));
+      const name=document.createElement('span');name.textContent=plugin.name;name.title=plugin.path;
+      label.append(enabled,name);
+      const remove=document.createElement('button');remove.className='button';remove.textContent='Remove';
+      remove.addEventListener('click',()=>action('configure_developer_plugins',{enabled:config.enabled,plugin:plugin.sha256,remove:true}));
+      row.append(label,remove);$('developer-plugins-list').append(row);
+    }
+    $('developer-plugins-list').dataset.signature=signature;
+  }
+  $('developer-plugins-list').querySelectorAll('input').forEach(element=>{ element.checked=Boolean(config.jars.find(plugin=>plugin.sha256===element.dataset.plugin)?.enabled); });
+  $('developer-plugins-list').querySelectorAll('button,input').forEach(element=>element.disabled=busy);
+}
+$('developer-plugins-enabled').addEventListener('change',()=>action('configure_developer_plugins',{enabled:$('developer-plugins-enabled').checked}));
+$('add-developer-plugin').addEventListener('click',()=>action('add_developer_plugin'));

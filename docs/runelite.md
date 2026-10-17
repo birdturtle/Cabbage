@@ -20,3 +20,5 @@ Supported download targets: Windows and Linux on x86_64 and aarch64. Windows acc
 - https://github.com/runelite/launcher/blob/master/src/main/java/net/runelite/launcher/Launcher.java
 - https://github.com/runelite/launcher/blob/master/src/main/java/net/runelite/launcher/ReflectionLauncher.java
 - https://api.adoptium.net/
+
+An optional [local developer-plugin mode](developer-plugins.md) starts the official client directly with its own sideloader and isolated settings. The ordinary launcher path above is unchanged.
